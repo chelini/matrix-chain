@@ -12,6 +12,7 @@ using namespace std;
 class BinaryOp;
 class UnaryOp;
 
+/// Generic expr of type BINARY, UNARY or OPERAND.
 class Expr {
 public:
   enum class ExprKind { BINARY, UNARY, OPERAND };
@@ -31,7 +32,7 @@ class BinaryOp : public Expr {
 public:
   enum class BinaryOpKind { MUL };
 
-public:
+private:
   shared_ptr<Expr> childLeft;
   shared_ptr<Expr> childRight;
   BinaryOpKind kind;
@@ -39,9 +40,11 @@ public:
 public:
   BinaryOp() = delete;
   BinaryOp(shared_ptr<Expr> left, shared_ptr<Expr> right, BinaryOpKind kind)
-      : childLeft(left), childRight(right), kind(kind),
-        Expr(ExprKind::BINARY){};
-  // BinaryOpKind getKind() { return kind; };
+      : Expr(ExprKind::BINARY), childLeft(left), childRight(right),
+        kind(kind){};
+  BinaryOpKind getKind() { return kind; };
+  shared_ptr<Expr> getLeftChild() { return childLeft; };
+  shared_ptr<Expr> getRightChild() { return childRight; };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
   }
@@ -51,14 +54,16 @@ class UnaryOp : public Expr {
 public:
   enum class UnaryOpKind { TRANS, INV };
 
-public:
+private:
   shared_ptr<Expr> child;
   UnaryOpKind kind;
 
 public:
   UnaryOp() = delete;
   UnaryOp(shared_ptr<Expr> child, UnaryOpKind kind)
-      : child(child), kind(kind), Expr(ExprKind::UNARY){};
+      : Expr(ExprKind::UNARY), child(child), kind(kind){};
+  shared_ptr<Expr> getChild() { return child; };
+  UnaryOpKind getKind() { return kind; };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
   }
@@ -76,7 +81,7 @@ private:
 public:
   Operand() = delete;
   Operand(string name, vector<int> shape)
-      : name(name), shape(shape), Expr(ExprKind::OPERAND){};
+      : Expr(ExprKind::OPERAND), name(name), shape(shape){};
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   }
@@ -91,19 +96,19 @@ public:
 void walk(shared_ptr<Expr> node, int level = 0) {
   if (node) {
     if (auto *binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
-      switch (binaryOp->kind) {
+      switch (binaryOp->getKind()) {
       case BinaryOp::BinaryOpKind::MUL:
         cout << string(level, ' ') << "(*\n";
         break;
       default:
         cout << "UNK";
       }
-      walk(binaryOp->childLeft, level + LEVEL_SPACES);
+      walk(binaryOp->getLeftChild(), level + LEVEL_SPACES);
       cout << " \n";
-      walk(binaryOp->childRight, level + LEVEL_SPACES);
+      walk(binaryOp->getRightChild(), level + LEVEL_SPACES);
     } // binaryOp
     if (auto *unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
-      switch (unaryOp->kind) {
+      switch (unaryOp->getKind()) {
       case UnaryOp::UnaryOpKind::TRANS:
         cout << string(level, ' ') << "t(";
         break;
@@ -113,7 +118,7 @@ void walk(shared_ptr<Expr> node, int level = 0) {
       default:
         cout << "UNK";
       }
-      walk(unaryOp->child);
+      walk(unaryOp->getChild());
       cout << ")";
     } // unaryOp
     if (auto *operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
@@ -123,9 +128,10 @@ void walk(shared_ptr<Expr> node, int level = 0) {
 }
 
 vector<long> getPVector(vector<Operand> &operands) {
+  cout << __func__ << "\n";
   vector<long> pVector;
-  for (auto matrix : operands) {
-    auto shape = matrix.getShape();
+  for (auto operand : operands) {
+    auto shape = operand.getShape();
     if (!pVector.size()) {
       pVector.push_back(shape[0]);
       pVector.push_back(shape[1]);
@@ -150,8 +156,28 @@ void printOptimalParens(const vector<vector<long>> &s, size_t i, size_t j,
   }
 }
 
-vector<vector<long>> getOptimalSplit(vector<Operand> &operands) {
+vector<Operand> collectOperands(vector<shared_ptr<Expr>> &exprs) {
+  cout << __func__ << "\n";
+  vector<Operand> operands;
+  for (auto expr : exprs) {
+    if (Operand *operand = llvm::dyn_cast_or_null<Operand>(expr.get()))
+      operands.push_back(*operand);
+    else if (auto unary = llvm::dyn_cast_or_null<UnaryOp>(expr.get())) {
+      if (Operand *operand =
+              llvm::dyn_cast_or_null<Operand>(unary->getChild().get()))
+        operands.push_back(*operand);
+    } else {
+      assert(0 && "only operand or unary op here");
+    }
+  }
+  assert(exprs.size() == operands.size() && "lost something");
+  return operands;
+}
 
+vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
+  cout << __func__ << "\n";
+
+  vector<Operand> operands = collectOperands(exprs);
   vector<long> pVector = getPVector(operands);
   const size_t n = pVector.size();
   vector<vector<long>> m(n, vector<long>(n, std::numeric_limits<long>::max()));
@@ -172,10 +198,10 @@ vector<vector<long>> getOptimalSplit(vector<Operand> &operands) {
       m[i][j] = std::numeric_limits<long>::max();
       for (size_t k = i; k <= j - 1; k++) {
         long cost = pVector.at(i - 1) * pVector.at(k) * pVector.at(j);
-        cout << "cost for sub: " << i << " " << j << " --- " << k + 1 << " "
-             << j << "\n";
-        cout << "is : " << m[i][k] << " " << m[k + 1][j] << "  " << cost
-             << "\n";
+        // cout << "cost for sub: " << i << " " << j << " --- " << k + 1 << " "
+        //     << j << "\n";
+        // cout << "is : " << m[i][k] << " " << m[k + 1][j] << "  " << cost
+        //     << "\n";
         q = m[i][k] + m[k + 1][j] + cost;
         if (q < m[i][j]) {
           m[i][j] = q;
@@ -229,13 +255,15 @@ shared_ptr<Expr> trans(shared_ptr<Expr> child) {
 }
 
 int main() {
-
+  cout << __func__ << "\n";
   shared_ptr<Expr> A(new Operand("A1", {30, 35}));
-  Matrix B = Matrix("A2", {35, 15});
-  Matrix C = Matrix("A3", {15, 5});
-  Matrix D = Matrix("A4", {5, 10});
-  Matrix E = Matrix("A5", {10, 20});
-  Matrix F = Matrix("A6", {20, 25});
+  shared_ptr<Expr> B(new Operand("A2", {35, 15}));
+  shared_ptr<Expr> C(new Operand("A3", {15, 5}));
+  shared_ptr<Expr> D(new Operand("A4", {5, 10}));
+  shared_ptr<Expr> E(new Operand("A5", {10, 20}));
+  shared_ptr<Expr> F(new Operand("A6", {20, 25}));
+  vector<shared_ptr<Expr>> operands{A, B, C, D, E, F};
+  auto result = getOptimalSplit(operands);
 
   cout << "\n\n";
   return 0;
