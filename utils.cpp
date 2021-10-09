@@ -103,6 +103,15 @@ static void printProperties(vector<Expr::ExprProperty> properties) {
   }
 }
 
+/// print the shape of the operand.
+static void printShape(vector<int> shape) {
+  for (size_t i = 0, e = shape.size(); i < e; i++) {
+    cout << shape[i];
+    if (i != e - 1)
+      cout << ", ";
+  }
+}
+
 #define LEVEL_SPACES 2
 
 /// Walk a generic expression.
@@ -137,6 +146,8 @@ void walk(shared_ptr<Expr> node, int level) {
     if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
       cout << string(level, ' ') << operand->getName() << " [";
       printProperties(operand->getProperties());
+      cout << "] [";
+      printShape(operand->getShape());
       cout << "]";
     } // operand
   }
@@ -162,10 +173,12 @@ shared_ptr<Expr> trans(shared_ptr<Expr> child) {
   return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::TRANSPOSE));
 }
 
-static vector<long> getPVector(vector<Operand> &operands) {
+static vector<long> getPVector(vector<shared_ptr<Expr>> exprs) {
   vector<long> pVector;
-  for (auto operand : operands) {
-    auto shape = operand.getShape();
+  for (auto expr : exprs) {
+    auto operand = llvm::dyn_cast_or_null<Operand>(expr.get());
+    assert(operand && "must be non null");
+    auto shape = operand->getShape();
     if (!pVector.size()) {
       pVector.push_back(shape[0]);
       pVector.push_back(shape[1]);
@@ -177,10 +190,12 @@ static vector<long> getPVector(vector<Operand> &operands) {
 }
 
 static void printOptimalParens(const vector<vector<long>> &s, size_t i,
-                               size_t j, vector<Operand> operands) {
+                               size_t j, vector<shared_ptr<Expr>> operands) {
   if (i == j) {
     cout << " ";
-    cout << operands[i - 1].getName();
+    auto operand = llvm::dyn_cast_or_null<Operand>(operands[i - 1].get());
+    assert(operand && "must be non null");
+    cout << operand->getName();
     cout << "  ";
   } else {
     cout << "(";
@@ -190,20 +205,25 @@ static void printOptimalParens(const vector<vector<long>> &s, size_t i,
   }
 }
 
-static vector<Operand> collectOperands(vector<shared_ptr<Expr>> &exprs) {
-  vector<Operand> operands;
-  for (auto expr : exprs) {
-    if (Operand *operand = llvm::dyn_cast_or_null<Operand>(expr.get()))
-      operands.push_back(*operand);
-    else if (auto unary = llvm::dyn_cast_or_null<UnaryOp>(expr.get())) {
-      if (Operand *operand =
-              llvm::dyn_cast_or_null<Operand>(unary->getChild().get()))
-        operands.push_back(*operand);
-    } else {
-      assert(0 && "only operand or unary op here");
+static void collectOperandsImpl(shared_ptr<Expr> node,
+                                vector<shared_ptr<Expr>> &operands) {
+  if (node) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
+      collectOperandsImpl(binaryOp->getLeftChild(), operands);
+      collectOperandsImpl(binaryOp->getRightChild(), operands);
+    }
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
+      collectOperandsImpl(unaryOp->getChild(), operands);
+    }
+    if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
+      operands.push_back(node);
     }
   }
-  assert(exprs.size() == operands.size() && "lost something");
+}
+
+static vector<shared_ptr<Expr>> collectOperands(shared_ptr<Expr> &expr) {
+  vector<shared_ptr<Expr>> operands;
+  collectOperandsImpl(expr, operands);
   return operands;
 }
 
@@ -235,8 +255,8 @@ struct ResultMCP {
   vector<vector<long>> s;
 };
 
-ResultMCP runMCP(vector<shared_ptr<Expr>> &exprs) {
-  vector<Operand> operands = collectOperands(exprs);
+ResultMCP runMCP(shared_ptr<Expr> &expr) {
+  vector<shared_ptr<Expr>> operands = collectOperands(expr);
   vector<long> pVector = getPVector(operands);
   const size_t n = pVector.size();
   vector<vector<long>> m(n, vector<long>(n, std::numeric_limits<long>::max()));
@@ -247,7 +267,7 @@ ResultMCP runMCP(vector<shared_ptr<Expr>> &exprs) {
                                         vector<shared_ptr<Expr>>(n, nullptr));
 
   for (size_t i = 0; i < n - 1; i++)
-    tmps[i + 1][i + 1] = exprs.at(i);
+    tmps[i + 1][i + 1] = operands.at(i);
 
   for (size_t i = 0; i < n; i++)
     m[i][i] = 0;
@@ -308,8 +328,8 @@ ResultMCP runMCP(vector<shared_ptr<Expr>> &exprs) {
   return {m, s};
 }
 
-long getMCPFlops(vector<shared_ptr<Expr>> &exprs) {
-  ResultMCP result = runMCP(exprs);
+long getMCPFlops(shared_ptr<Expr> &expr) {
+  ResultMCP result = runMCP(expr);
   auto m = result.m;
   return m[1][m.size() - 1];
 }

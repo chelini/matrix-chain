@@ -11,8 +11,8 @@ TEST(Chain, MCP) {
   shared_ptr<Expr> D(new Operand("A4", {5, 10}));
   shared_ptr<Expr> E(new Operand("A5", {10, 20}));
   shared_ptr<Expr> F(new Operand("A6", {20, 25}));
-  vector<shared_ptr<Expr>> operands{A, B, C, D, E, F};
-  long result = getMCPFlops(operands);
+  auto e = mul(A, mul(B, mul(C, mul(D, mul(E, F)))));
+  long result = getMCPFlops(e);
   EXPECT_EQ(result, 15125);
 }
 
