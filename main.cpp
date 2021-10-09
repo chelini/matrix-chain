@@ -11,12 +11,13 @@ using namespace std;
 
 class BinaryOp;
 class UnaryOp;
+class Operand;
 
 /// Generic expr of type BINARY, UNARY or OPERAND.
 class Expr {
 public:
   enum class ExprKind { BINARY, UNARY, OPERAND };
-  enum class ExprProperty { SYMM };
+  enum class ExprProperty { UPPER_TRIANGULAR, LOWER_TRIANGULAR };
 
 private:
   const ExprKind kind;
@@ -24,6 +25,10 @@ private:
 public:
   ExprKind getKind() const { return kind; }
   virtual vector<Expr::ExprProperty> inferProperty() = 0;
+  virtual void setProperties(vector<Expr::ExprProperty> properties) {
+    assert(0 && "can set properties only for operands");
+  };
+  virtual bool isUpperTriangular() = 0;
 
 protected:
   Expr() = delete;
@@ -49,6 +54,7 @@ public:
   shared_ptr<Expr> getLeftChild() { return childLeft; };
   shared_ptr<Expr> getRightChild() { return childRight; };
   vector<Expr::ExprProperty> inferProperty() { return {}; };
+  bool isUpperTriangular() { return false; };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
   };
@@ -57,7 +63,7 @@ public:
 /// Unary operation like transpose or inverse.
 class UnaryOp : public Expr {
 public:
-  enum class UnaryOpKind { TRANS, INV };
+  enum class UnaryOpKind { TRANSPOSE, INVERSE };
 
 private:
   shared_ptr<Expr> child;
@@ -69,7 +75,12 @@ public:
       : Expr(ExprKind::UNARY), child(child), kind(kind){};
   shared_ptr<Expr> getChild() { return child; };
   UnaryOpKind getKind() { return kind; };
-  vector<Expr::ExprProperty> inferProperty() { return {}; };
+  vector<Expr::ExprProperty> inferProperty();
+  bool isUpperTriangular() {
+    cout << "unary"
+         << "\n";
+    return false;
+  }
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
   };
@@ -93,14 +104,57 @@ public:
     this->properties = properties;
   };
   vector<Expr::ExprProperty> inferProperty() { return properties; };
+  bool isUpperTriangular() {
+    cout << "operand"
+         << "\n";
+    return false;
+  }
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   };
 };
 
+/// Multiply two expressions.
+shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right) {
+  assert(left && "left expr must be non null");
+  assert(right && "right expr must be non null");
+  return shared_ptr<Expr>(
+      new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
+}
+
+/// invert an expression.
+shared_ptr<Expr> inv(shared_ptr<Expr> child) {
+  assert(child && "child expr must be non null");
+  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::INVERSE));
+}
+
+/// transpose an expression.
+shared_ptr<Expr> trans(shared_ptr<Expr> child) {
+  assert(child && "child expr must be non null");
+  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::TRANSPOSE));
+}
+
+/// infer properties for UnaryExpr.
+vector<Expr::ExprProperty> UnaryOp::inferProperty() {
+  UnaryOpKind kind = this->getKind();
+  switch (kind) {
+  case UnaryOpKind::TRANSPOSE: {
+    bool isUpT = this->getChild().get()->isUpperTriangular();
+    if (isUpT)
+      return {Expr::ExprProperty::UPPER_TRIANGULAR};
+    return {};
+  }
+  default:
+    assert(0 && "not handled");
+  }
+  assert(0 && "unreachable");
+  return {};
+}
+
+/// Walk a generic expression.
 void walk(shared_ptr<Expr> node, int level = 0) {
   if (node) {
-    if (auto *binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
       switch (binaryOp->getKind()) {
       case BinaryOp::BinaryOpKind::MUL:
         cout << string(level, ' ') << "(*\n";
@@ -112,12 +166,12 @@ void walk(shared_ptr<Expr> node, int level = 0) {
       cout << " \n";
       walk(binaryOp->getRightChild(), level + LEVEL_SPACES);
     } // binaryOp
-    if (auto *unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
       switch (unaryOp->getKind()) {
-      case UnaryOp::UnaryOpKind::TRANS:
+      case UnaryOp::UnaryOpKind::TRANSPOSE:
         cout << string(level, ' ') << "t(";
         break;
-      case UnaryOp::UnaryOpKind::INV:
+      case UnaryOp::UnaryOpKind::INVERSE:
         cout << string(level, ' ') << "i(";
         break;
       default:
@@ -126,7 +180,7 @@ void walk(shared_ptr<Expr> node, int level = 0) {
       walk(unaryOp->getChild());
       cout << ")";
     } // unaryOp
-    if (auto *operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
+    if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
       cout << string(level, ' ') << operand->getName();
     } // operand
   }
@@ -197,23 +251,6 @@ void print(vector<vector<shared_ptr<Expr>>> &tmps, bool bitLayout = false) {
     }
     cout << "\n";
   }
-}
-
-shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right) {
-  assert(left && "left expr must be non null");
-  assert(right && "right expr must be non null");
-  return shared_ptr<Expr>(
-      new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
-}
-
-shared_ptr<Expr> inv(shared_ptr<Expr> child) {
-  assert(child && "child expr must be non null");
-  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::INV));
-}
-
-shared_ptr<Expr> trans(shared_ptr<Expr> child) {
-  assert(child && "child expr must be non null");
-  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::TRANS));
 }
 
 vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
@@ -290,6 +327,8 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
   return s;
 }
 
+// TODO: RTTI: We shoud avoid getting the raw pointer
+// from a shared_ptr<Expr>
 int main() {
   cout << __func__ << "\n";
   shared_ptr<Expr> A(new Operand("A1", {30, 35}));
@@ -300,6 +339,10 @@ int main() {
   shared_ptr<Expr> F(new Operand("A6", {20, 25}));
   vector<shared_ptr<Expr>> operands{A, B, C, D, E, F};
   auto result = getOptimalSplit(operands);
+
+  shared_ptr<Expr> a(new Operand("A", {20, 20}));
+  a->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
+  shared_ptr<Expr> b(new Operand("B", {20, 20}));
 
   cout << "\n\n";
   return 0;
