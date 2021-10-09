@@ -29,6 +29,7 @@ public:
     assert(0 && "can set properties only for operands");
   };
   virtual bool isUpperTriangular() = 0;
+  virtual bool isLowerTriangular() = 0;
 
 protected:
   Expr() = delete;
@@ -54,7 +55,26 @@ public:
   shared_ptr<Expr> getLeftChild() { return childLeft; };
   shared_ptr<Expr> getRightChild() { return childRight; };
   vector<Expr::ExprProperty> inferProperty() { return {}; };
-  bool isUpperTriangular() { return false; };
+  bool isUpperTriangular() {
+    auto kind = this->getKind();
+    switch (kind) {
+    case BinaryOp::BinaryOpKind::MUL:
+      return childLeft->isUpperTriangular() && childRight->isUpperTriangular();
+    default:
+      assert(0 && "UNK");
+    }
+    return false;
+  };
+  bool isLowerTriangular() {
+    auto kind = this->getKind();
+    switch (kind) {
+    case BinaryOp::BinaryOpKind::MUL:
+      return childLeft->isLowerTriangular() && childRight->isLowerTriangular();
+    default:
+      assert(0 && "UNK");
+    }
+    return false;
+  };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
   };
@@ -77,10 +97,25 @@ public:
   UnaryOpKind getKind() { return kind; };
   vector<Expr::ExprProperty> inferProperty();
   bool isUpperTriangular() {
-    cout << "unary"
-         << "\n";
+    auto kind = this->getKind();
+    switch (kind) {
+    case UnaryOp::UnaryOpKind::TRANSPOSE:
+      return child->isLowerTriangular();
+    default:
+      assert(0 && "UNK");
+    }
     return false;
-  }
+  };
+  bool isLowerTriangular() {
+    auto kind = this->getKind();
+    switch (kind) {
+    case UnaryOp::UnaryOpKind::TRANSPOSE:
+      return child->isUpperTriangular();
+    default:
+      assert(0 && "UNK");
+    }
+    return false;
+  };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
   };
@@ -105,10 +140,23 @@ public:
   };
   vector<Expr::ExprProperty> inferProperty() { return properties; };
   bool isUpperTriangular() {
-    cout << "operand"
-         << "\n";
-    return false;
-  }
+    // make this better
+    bool found = false;
+    for (auto property : properties) {
+      if (property == Expr::ExprProperty::UPPER_TRIANGULAR)
+        found = true;
+    }
+    return found;
+  };
+  bool isLowerTriangular() {
+    // make this better
+    bool found = false;
+    for (auto property : properties) {
+      if (property == Expr::ExprProperty::LOWER_TRIANGULAR)
+        found = true;
+    }
+    return found;
+  };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   };
@@ -139,8 +187,7 @@ vector<Expr::ExprProperty> UnaryOp::inferProperty() {
   UnaryOpKind kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE: {
-    bool isUpT = this->getChild().get()->isUpperTriangular();
-    if (isUpT)
+    if (this->isUpperTriangular())
       return {Expr::ExprProperty::UPPER_TRIANGULAR};
     return {};
   }
@@ -149,6 +196,24 @@ vector<Expr::ExprProperty> UnaryOp::inferProperty() {
   }
   assert(0 && "unreachable");
   return {};
+}
+
+/// print an array of properties.
+void printProperties(vector<Expr::ExprProperty> properties) {
+  for (size_t i = 0, e = properties.size(); i < e; i++) {
+    switch (properties[i]) {
+    case Expr::ExprProperty::LOWER_TRIANGULAR:
+      cout << "LOWER_TRIANGULAR";
+      break;
+    case Expr::ExprProperty::UPPER_TRIANGULAR:
+      cout << "UPPER_TRIANGULAR";
+      break;
+    default:
+      assert(0 && "UNK");
+    }
+    if (i != e - 1)
+      cout << ", ";
+  }
 }
 
 /// Walk a generic expression.
@@ -169,10 +234,10 @@ void walk(shared_ptr<Expr> node, int level = 0) {
     if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
       switch (unaryOp->getKind()) {
       case UnaryOp::UnaryOpKind::TRANSPOSE:
-        cout << string(level, ' ') << "t(";
+        cout << string(level, ' ') << "transpose(";
         break;
       case UnaryOp::UnaryOpKind::INVERSE:
-        cout << string(level, ' ') << "i(";
+        cout << string(level, ' ') << "inverse(";
         break;
       default:
         cout << "UNK";
@@ -181,7 +246,9 @@ void walk(shared_ptr<Expr> node, int level = 0) {
       cout << ")";
     } // unaryOp
     if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
-      cout << string(level, ' ') << operand->getName();
+      cout << string(level, ' ') << operand->getName() << " [";
+      printProperties(operand->getProperties());
+      cout << "]";
     } // operand
   }
 }
@@ -343,6 +410,9 @@ int main() {
   shared_ptr<Expr> a(new Operand("A", {20, 20}));
   a->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
   shared_ptr<Expr> b(new Operand("B", {20, 20}));
+  b->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
+  auto e = mul(a, trans(b));
+  cout << "lt: " << e->isLowerTriangular() << "\n";
 
   cout << "\n\n";
   return 0;
