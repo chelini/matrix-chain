@@ -138,6 +138,6 @@ void walk(shared_ptr<Expr> node, int level = 0);
 shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right);
 shared_ptr<Expr> inv(shared_ptr<Expr> child);
 shared_ptr<Expr> trans(shared_ptr<Expr> child);
-vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs);
+long getMCPFlops(vector<shared_ptr<Expr>> &exprs);
 
 #endif

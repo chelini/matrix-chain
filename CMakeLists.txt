@@ -23,6 +23,8 @@ add_executable(main
   main.cpp
 )
 
+target_include_directories(matrixChain PUBLIC ${CMAKE_SOURCE_DIR})
+
 target_link_libraries(main matrixChain)
 
 add_subdirectory(test)

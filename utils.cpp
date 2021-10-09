@@ -163,7 +163,6 @@ shared_ptr<Expr> trans(shared_ptr<Expr> child) {
 }
 
 static vector<long> getPVector(vector<Operand> &operands) {
-  cout << __func__ << "\n";
   vector<long> pVector;
   for (auto operand : operands) {
     auto shape = operand.getShape();
@@ -192,7 +191,6 @@ static void printOptimalParens(const vector<vector<long>> &s, size_t i,
 }
 
 static vector<Operand> collectOperands(vector<shared_ptr<Expr>> &exprs) {
-  cout << __func__ << "\n";
   vector<Operand> operands;
   for (auto expr : exprs) {
     if (Operand *operand = llvm::dyn_cast_or_null<Operand>(expr.get()))
@@ -209,6 +207,7 @@ static vector<Operand> collectOperands(vector<shared_ptr<Expr>> &exprs) {
   return operands;
 }
 
+#if DEBUG
 static void print(vector<vector<shared_ptr<Expr>>> &tmps,
                   bool bitLayout = false) {
   int rows = tmps.size();
@@ -229,10 +228,14 @@ static void print(vector<vector<shared_ptr<Expr>>> &tmps,
     cout << "\n";
   }
 }
+#endif
 
-vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
-  cout << __func__ << "\n";
+struct ResultMCP {
+  vector<vector<long>> m;
+  vector<vector<long>> s;
+};
 
+ResultMCP runMCP(vector<shared_ptr<Expr>> &exprs) {
   vector<Operand> operands = collectOperands(exprs);
   vector<long> pVector = getPVector(operands);
   const size_t n = pVector.size();
@@ -268,6 +271,7 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
     }
   }
 
+#if DEBUG
   cout << "\n\n----tmps----\n";
   print(tmps, true);
   cout << "\n";
@@ -300,6 +304,12 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
   cout << "\n";
   printOptimalParens(s, 1, operands.size(), operands);
   cout << "\n\n";
+#endif
+  return {m, s};
+}
 
-  return s;
+long getMCPFlops(vector<shared_ptr<Expr>> &exprs) {
+  ResultMCP result = runMCP(exprs);
+  auto m = result.m;
+  return m[1][m.size() - 1];
 }
