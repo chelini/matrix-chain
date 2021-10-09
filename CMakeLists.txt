@@ -15,9 +15,15 @@ endif (VERBOSE)
 
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
 
+add_library(matrixChain
+  utils.cpp
+)
+
 add_executable(main
   main.cpp
 )
 
-#add_subdirectory(test)
+target_link_libraries(main matrixChain)
+
+add_subdirectory(test)
 #add_subdirectory(docs)
