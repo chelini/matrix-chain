@@ -34,7 +34,7 @@ int main() {
   shared_ptr<Expr> b(new Operand("b", {20, 25}));
   auto e = mul(trans(a), mul(a, b));
   walk(e);
-
+  getMCPFlops(e);
   cout << "\n\n";
   return 0;
 }

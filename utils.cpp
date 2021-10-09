@@ -269,6 +269,11 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
   for (size_t i = 0; i < n - 1; i++)
     tmps[i + 1][i + 1] = operands.at(i);
 
+#if DEBUG
+  cout << "\n\n--b-tmps----\n";
+  print(tmps, true);
+#endif
+
   for (size_t i = 0; i < n; i++)
     m[i][i] = 0;
 
@@ -279,6 +284,14 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
       j = i + l - 1;
       m[i][j] = std::numeric_limits<long>::max();
       for (size_t k = i; k <= j - 1; k++) {
+
+#if DEBUG
+        cout << "---\n";
+        auto tmpexpr = mul(tmps[i][k], tmps[k + 1][j]);
+        walk(tmpexpr);
+        cout << "\n---\n\n";
+#endif
+
         long cost = pVector.at(i - 1) * pVector.at(k) * pVector.at(j);
         q = m[i][k] + m[k + 1][j] + cost;
         if (q < m[i][j]) {
@@ -292,7 +305,7 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
   }
 
 #if DEBUG
-  cout << "\n\n----tmps----\n";
+  cout << "\n\n--a-tmps----\n";
   print(tmps, true);
   cout << "\n";
   walk(tmps[1][tmps.size() - 1]);
