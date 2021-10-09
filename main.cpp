@@ -16,18 +16,21 @@ class UnaryOp;
 class Expr {
 public:
   enum class ExprKind { BINARY, UNARY, OPERAND };
+  enum class ExprProperty { SYMM };
 
 private:
   const ExprKind kind;
 
 public:
   ExprKind getKind() const { return kind; }
+  virtual vector<Expr::ExprProperty> inferProperty() = 0;
 
 protected:
   Expr() = delete;
   Expr(ExprKind kind) : kind(kind){};
 };
 
+/// Binary operation (i.e., MUL).
 class BinaryOp : public Expr {
 public:
   enum class BinaryOpKind { MUL };
@@ -45,11 +48,13 @@ public:
   BinaryOpKind getKind() { return kind; };
   shared_ptr<Expr> getLeftChild() { return childLeft; };
   shared_ptr<Expr> getRightChild() { return childRight; };
+  vector<Expr::ExprProperty> inferProperty() { return {}; };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
-  }
+  };
 };
 
+/// Unary operation like transpose or inverse.
 class UnaryOp : public Expr {
 public:
   enum class UnaryOpKind { TRANS, INV };
@@ -64,32 +69,32 @@ public:
       : Expr(ExprKind::UNARY), child(child), kind(kind){};
   shared_ptr<Expr> getChild() { return child; };
   UnaryOpKind getKind() { return kind; };
+  vector<Expr::ExprProperty> inferProperty() { return {}; };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
-  }
+  };
 };
 
+/// Generic operand (i.e., matrix or vector).
 class Operand : public Expr {
-public:
-  enum class OperandProperty { SYMM };
-
 private:
   string name;
   vector<int> shape;
-  vector<OperandProperty> properties;
+  vector<Expr::ExprProperty> properties;
 
 public:
   Operand() = delete;
   Operand(string name, vector<int> shape)
       : Expr(ExprKind::OPERAND), name(name), shape(shape){};
-  static bool classof(const Expr *expr) {
-    return expr->getKind() == ExprKind::OPERAND;
-  }
   string getName() { return name; };
   vector<int> getShape() { return shape; };
-  vector<OperandProperty> getProperties() { return properties; };
-  void setProperties(vector<OperandProperty> properties) {
+  vector<Expr::ExprProperty> getProperties() { return properties; };
+  void setProperties(vector<Expr::ExprProperty> properties) {
     this->properties = properties;
+  };
+  vector<Expr::ExprProperty> inferProperty() { return properties; };
+  static bool classof(const Expr *expr) {
+    return expr->getKind() == ExprKind::OPERAND;
   };
 };
 
@@ -174,6 +179,43 @@ vector<Operand> collectOperands(vector<shared_ptr<Expr>> &exprs) {
   return operands;
 }
 
+void print(vector<vector<shared_ptr<Expr>>> &tmps, bool bitLayout = false) {
+  int rows = tmps.size();
+  int cols = tmps[0].size();
+
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      if (tmps[i][j]) {
+        if (bitLayout)
+          cout << "1 ";
+        else
+          walk(tmps[i][j]);
+      } else {
+        if (bitLayout)
+          cout << "0 ";
+      }
+    }
+    cout << "\n";
+  }
+}
+
+shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right) {
+  assert(left && "left expr must be non null");
+  assert(right && "right expr must be non null");
+  return shared_ptr<Expr>(
+      new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
+}
+
+shared_ptr<Expr> inv(shared_ptr<Expr> child) {
+  assert(child && "child expr must be non null");
+  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::INV));
+}
+
+shared_ptr<Expr> trans(shared_ptr<Expr> child) {
+  assert(child && "child expr must be non null");
+  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::TRANS));
+}
+
 vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
   cout << __func__ << "\n";
 
@@ -187,6 +229,9 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
   vector<vector<shared_ptr<Expr>>> tmps(n,
                                         vector<shared_ptr<Expr>>(n, nullptr));
 
+  for (size_t i = 0; i < n - 1; i++)
+    tmps[i + 1][i + 1] = exprs.at(i);
+
   for (size_t i = 0; i < n; i++)
     m[i][i] = 0;
 
@@ -198,18 +243,21 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
       m[i][j] = std::numeric_limits<long>::max();
       for (size_t k = i; k <= j - 1; k++) {
         long cost = pVector.at(i - 1) * pVector.at(k) * pVector.at(j);
-        // cout << "cost for sub: " << i << " " << j << " --- " << k + 1 << " "
-        //     << j << "\n";
-        // cout << "is : " << m[i][k] << " " << m[k + 1][j] << "  " << cost
-        //     << "\n";
         q = m[i][k] + m[k + 1][j] + cost;
         if (q < m[i][j]) {
+          tmps[i][j] = mul(tmps[i][k], tmps[k + 1][j]);
+          tmps[i][j].get()->inferProperty();
           m[i][j] = q;
           s[i][j] = k;
         }
       }
     }
   }
+
+  cout << "\n\n----tmps----\n";
+  print(tmps, true);
+  cout << "\n";
+  walk(tmps[1][tmps.size() - 1]);
 
   cout << "\n\n-----s------\n";
   int rows = s.size();
@@ -223,7 +271,7 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
     }
     cout << "\n";
   }
-  cout << "-----m------\n";
+  cout << "\n-----m------\n";
   rows = m.size();
   cols = m[0].size();
   for (int i = 0; i < rows; i++) {
@@ -235,23 +283,11 @@ vector<vector<long>> getOptimalSplit(vector<shared_ptr<Expr>> &exprs) {
     }
     cout << "\n";
   }
+  cout << "\n";
   printOptimalParens(s, 1, operands.size(), operands);
   cout << "\n\n";
 
   return s;
-}
-
-shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right) {
-  return shared_ptr<Expr>(
-      new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
-}
-
-shared_ptr<Expr> inv(shared_ptr<Expr> child) {
-  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::INV));
-}
-
-shared_ptr<Expr> trans(shared_ptr<Expr> child) {
-  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::TRANS));
 }
 
 int main() {
