@@ -52,7 +52,7 @@ bool UnaryOp::isLowerTriangular() {
 bool Operand::isUpperTriangular() {
   // TODO: make this better
   bool found = false;
-  for (auto property : properties) {
+  for (auto property : inferredProperties) {
     if (property == Expr::ExprProperty::UPPER_TRIANGULAR)
       found = true;
   }
@@ -62,7 +62,7 @@ bool Operand::isUpperTriangular() {
 bool Operand::isLowerTriangular() {
   // TODO: make this better
   bool found = false;
-  for (auto property : properties) {
+  for (auto property : inferredProperties) {
     if (property == Expr::ExprProperty::LOWER_TRIANGULAR)
       found = true;
   }
@@ -70,7 +70,8 @@ bool Operand::isLowerTriangular() {
 }
 
 /// infer properties for UnaryExpr.
-vector<Expr::ExprProperty> UnaryOp::inferProperty() {
+void UnaryOp::inferProperties() {
+  /*
   UnaryOpKind kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE: {
@@ -83,7 +84,10 @@ vector<Expr::ExprProperty> UnaryOp::inferProperty() {
   }
   assert(0 && "unreachable");
   return {};
+  */
 }
+
+void BinaryOp::inferProperties() { return; }
 
 /// print an array of expression properties.
 static void printProperties(vector<Expr::ExprProperty> properties) {
@@ -215,7 +219,7 @@ static void collectOperandsImpl(shared_ptr<Expr> node,
     if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
       collectOperandsImpl(unaryOp->getChild(), operands);
     }
-    if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
+    if (llvm::dyn_cast_or_null<Operand>(node.get())) {
       operands.push_back(node);
     }
   }
@@ -250,6 +254,8 @@ static void print(vector<vector<shared_ptr<Expr>>> &tmps,
 }
 #endif
 
+static string match(shared_ptr<Expr> expr) { return "null"; }
+
 struct ResultMCP {
   vector<vector<long>> m;
   vector<vector<long>> s;
@@ -270,7 +276,7 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
     tmps[i + 1][i + 1] = operands.at(i);
 
 #if DEBUG
-  cout << "\n\n--b-tmps----\n";
+  cout << "\n\n-before-tmps-\n";
   print(tmps, true);
 #endif
 
@@ -289,6 +295,7 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
         cout << "---\n";
         auto tmpexpr = mul(tmps[i][k], tmps[k + 1][j]);
         walk(tmpexpr);
+        string kernel = match(tmpexpr);
         cout << "\n---\n\n";
 #endif
 
@@ -296,7 +303,8 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
         q = m[i][k] + m[k + 1][j] + cost;
         if (q < m[i][j]) {
           tmps[i][j] = mul(tmps[i][k], tmps[k + 1][j]);
-          tmps[i][j].get()->inferProperty();
+          // TODO: do we need to attach properties to Expr?
+          tmps[i][j]->inferProperties();
           m[i][j] = q;
           s[i][j] = k;
         }
@@ -305,7 +313,7 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
   }
 
 #if DEBUG
-  cout << "\n\n--a-tmps----\n";
+  cout << "\n\n-after-tmps-\n";
   print(tmps, true);
   cout << "\n";
   walk(tmps[1][tmps.size() - 1]);

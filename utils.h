@@ -40,18 +40,21 @@ public:
 private:
   const ExprKind kind;
 
+protected:
+  vector<Expr::ExprProperty> inferredProperties;
+
 public:
   ExprKind getKind() const { return kind; }
-  virtual vector<Expr::ExprProperty> inferProperty() = 0;
   virtual void setProperties(vector<Expr::ExprProperty> properties) {
     assert(0 && "can set properties only for operands");
   };
+  virtual void inferProperties() = 0;
   virtual bool isUpperTriangular() = 0;
   virtual bool isLowerTriangular() = 0;
 
 protected:
   Expr() = delete;
-  Expr(ExprKind kind) : kind(kind){};
+  Expr(ExprKind kind) : kind(kind), inferredProperties({}){};
 };
 
 /// Binary operation (i.e., MUL).
@@ -70,9 +73,9 @@ public:
       : Expr(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
   BinaryOpKind getKind() { return kind; };
+  void inferProperties();
   shared_ptr<Expr> getLeftChild() { return childLeft; };
   shared_ptr<Expr> getRightChild() { return childRight; };
-  vector<Expr::ExprProperty> inferProperty() { return {}; };
   bool isUpperTriangular();
   bool isLowerTriangular();
   static bool classof(const Expr *expr) {
@@ -93,9 +96,9 @@ public:
   UnaryOp() = delete;
   UnaryOp(shared_ptr<Expr> child, UnaryOpKind kind)
       : Expr(ExprKind::UNARY), child(child), kind(kind){};
+  void inferProperties();
   shared_ptr<Expr> getChild() { return child; };
   UnaryOpKind getKind() { return kind; };
-  vector<Expr::ExprProperty> inferProperty();
   bool isUpperTriangular();
   bool isLowerTriangular();
   static bool classof(const Expr *expr) {
@@ -108,7 +111,6 @@ class Operand : public Expr {
 private:
   string name;
   vector<int> shape;
-  vector<Expr::ExprProperty> properties;
 
 public:
   Operand() = delete;
@@ -116,11 +118,11 @@ public:
       : Expr(ExprKind::OPERAND), name(name), shape(shape){};
   string getName() { return name; };
   vector<int> getShape() { return shape; };
-  vector<Expr::ExprProperty> getProperties() { return properties; };
+  vector<Expr::ExprProperty> getProperties() { return inferredProperties; };
   void setProperties(vector<Expr::ExprProperty> properties) {
-    this->properties = properties;
+    inferredProperties = properties;
   };
-  vector<Expr::ExprProperty> inferProperty() { return properties; };
+  void inferProperties(){};
   bool isUpperTriangular();
   bool isLowerTriangular();
   static bool classof(const Expr *expr) {
