@@ -16,7 +16,7 @@ endif (VERBOSE)
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
 
 add_library(matrixChain
-  utils.cpp
+  chain.cpp
 )
 
 add_executable(main
