@@ -1,9 +1,22 @@
 #include "chain.h"
 #include "llvm/Support/Casting.h"
+#include <algorithm>
 #include <iostream>
 #include <limits>
 
 using namespace matrixchain;
+
+bool NaryOp::isUpperTriangular() {
+  return std::all_of(
+      this->getChildren().begin(), this->getChildren().end(),
+      [](shared_ptr<Expr> child) { return child->isUpperTriangular(); });
+}
+
+bool NaryOp::isLowerTriangular() {
+  return std::all_of(
+      this->getChildren().begin(), this->getChildren().end(),
+      [](shared_ptr<Expr> child) { return child->isLowerTriangular(); });
+}
 
 bool BinaryOp::isUpperTriangular() {
   auto kind = this->getKind();
@@ -21,6 +34,28 @@ bool BinaryOp::isLowerTriangular() {
   switch (kind) {
   case BinaryOp::BinaryOpKind::MUL:
     return childLeft->isLowerTriangular() && childRight->isLowerTriangular();
+  default:
+    assert(0 && "UNK");
+  }
+  return false;
+}
+
+bool BinaryOp::isSquare() {
+  auto kind = this->getKind();
+  switch (kind) {
+  case BinaryOp::BinaryOpKind::MUL:
+    return childLeft->isSquare() && childRight->isSquare();
+  default:
+    assert(0 && "UNK");
+  }
+  return false;
+}
+
+bool BinaryOp::isSymmetric() {
+  auto kind = this->getKind();
+  switch (kind) {
+  case BinaryOp::BinaryOpKind::MUL:
+    return childLeft->isSymmetric() && childRight->isSymmetric();
   default:
     assert(0 && "UNK");
   }
@@ -49,24 +84,52 @@ bool UnaryOp::isLowerTriangular() {
   return false;
 }
 
-bool Operand::isUpperTriangular() {
-  // TODO: make this better
-  bool found = false;
-  for (auto property : inferredProperties) {
-    if (property == Expr::ExprProperty::UPPER_TRIANGULAR)
-      found = true;
+bool UnaryOp::isSquare() {
+  auto kind = this->getKind();
+  switch (kind) {
+  case UnaryOp::UnaryOpKind::TRANSPOSE:
+    return child->isSquare();
+  default:
+    assert(0 && "UNK");
   }
-  return found;
+  return false;
+}
+
+bool UnaryOp::isSymmetric() {
+  auto kind = this->getKind();
+  switch (kind) {
+  case UnaryOp::UnaryOpKind::TRANSPOSE:
+    return child->isSymmetric();
+  default:
+    assert(0 && "UNK");
+  }
+  return false;
+}
+
+bool Operand::isUpperTriangular() {
+  return std::any_of(inferredProperties.begin(), inferredProperties.end(),
+                     [](Expr::ExprProperty p) {
+                       return p == Expr::ExprProperty::UPPER_TRIANGULAR;
+                     });
 }
 
 bool Operand::isLowerTriangular() {
-  // TODO: make this better
-  bool found = false;
-  for (auto property : inferredProperties) {
-    if (property == Expr::ExprProperty::LOWER_TRIANGULAR)
-      found = true;
-  }
-  return found;
+  return std::any_of(inferredProperties.begin(), inferredProperties.end(),
+                     [](Expr::ExprProperty p) {
+                       return p == Expr::ExprProperty::LOWER_TRIANGULAR;
+                     });
+}
+
+bool Operand::isSquare() {
+  return std::any_of(
+      inferredProperties.begin(), inferredProperties.end(),
+      [](Expr::ExprProperty p) { return p == Expr::ExprProperty::SQUARE; });
+}
+
+bool Operand::isSymmetric() {
+  return std::any_of(
+      inferredProperties.begin(), inferredProperties.end(),
+      [](Expr::ExprProperty p) { return p == Expr::ExprProperty::SYMMETRIC; });
 }
 
 /// infer properties for UnaryExpr.
@@ -147,6 +210,11 @@ void walk(shared_ptr<Expr> node, int level) {
       walk(unaryOp->getChild());
       cout << ")";
     } // unaryOp
+    if (auto naryOp = llvm::dyn_cast_or_null<NaryOp>(node.get())) {
+      for (auto child : naryOp->getChildren()) {
+        walk(child, level + LEVEL_SPACES);
+      }
+    }
     if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
       cout << string(level, ' ') << operand->getName() << " [";
       printProperties(operand->getProperties());
@@ -163,6 +231,16 @@ shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right) {
   assert(right && "right expr must be non null");
   return shared_ptr<Expr>(
       new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
+}
+
+shared_ptr<Expr> mul(vector<shared_ptr<Expr>> operands) {
+  assert(operands.size() >= 1 && "one or more mul");
+  if (operands.size() == 1)
+    return operands[0];
+  auto result = operands[0];
+  for (size_t i = 1; i < operands.size(); i++)
+    result = mul(result, operands[i]);
+  return result;
 }
 
 /// invert an expression.
@@ -254,7 +332,38 @@ static void print(vector<vector<shared_ptr<Expr>>> &tmps,
 }
 #endif
 
-static string match(shared_ptr<Expr> expr) { return "null"; }
+// TODO: n-ary how to handle?
+static pair<long, long> getKernelCost(shared_ptr<Expr> node, long &cost) {
+  if (node) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
+      pair<long, long> left = getKernelCost(binaryOp->getLeftChild(), cost);
+      pair<long, long> right = getKernelCost(binaryOp->getRightChild(), cost);
+      // note this cost must be the cost of the top level expr
+      // not the cost of the tree.
+      // GEMM by default adjust later on.
+      cost = left.first * left.second * right.second * 2;
+      // TRMM TODO: must be square the other?
+      if (binaryOp->getLeftChild()->isLowerTriangular()/* &&
+          binaryOp->getRightChild()->isSquare()*/)
+        cost >>= 1;
+      // SYMM
+      else if (binaryOp->getLeftChild()->isSymmetric() &&
+               binaryOp->getRightChild()->isSquare())
+        cost >>= 1;
+
+      return {left.first, right.second};
+    }
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
+      return getKernelCost(unaryOp->getChild(), cost);
+    }
+    if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
+      auto shape = operand->getShape();
+      assert(shape.size() == 2 && "must be 2d");
+      return {shape[0], shape[1]};
+    }
+  }
+  return {0, 0};
+}
 
 struct ResultMCP {
   vector<vector<long>> m;
@@ -295,15 +404,14 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
         cout << "---\n";
         auto tmpexpr = mul(tmps[i][k], tmps[k + 1][j]);
         walk(tmpexpr);
-        string kernel = match(tmpexpr);
         cout << "\n---\n\n";
 #endif
-
-        long cost = pVector.at(i - 1) * pVector.at(k) * pVector.at(j);
+        long cost = 0;
+        (void)getKernelCost(tmpexpr, cost);
+        // long cost = 2 * pVector.at(i - 1) * pVector.at(k) * pVector.at(j);
         q = m[i][k] + m[k + 1][j] + cost;
         if (q < m[i][j]) {
           tmps[i][j] = mul(tmps[i][k], tmps[k + 1][j]);
-          // TODO: do we need to attach properties to Expr?
           tmps[i][j]->inferProperties();
           m[i][j] = q;
           s[i][j] = k;
@@ -352,5 +460,8 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
 long getMCPFlops(shared_ptr<Expr> &expr) {
   ResultMCP result = runMCP(expr);
   auto m = result.m;
+#if DEBUG
+  cout << "FLOPS: " << m[1][m.size() - 1] << "\n";
+#endif
   return m[1][m.size() - 1];
 }

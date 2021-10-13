@@ -13,7 +13,24 @@ TEST(Chain, MCP) {
   shared_ptr<Expr> F(new Operand("A6", {20, 25}));
   auto e = mul(A, mul(B, mul(C, mul(D, mul(E, F)))));
   long result = getMCPFlops(e);
-  EXPECT_EQ(result, 15125);
+  EXPECT_EQ(result, 30250);
+}
+
+TEST(Chain, Cost) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  auto e = mul(A, B);
+  long result = getMCPFlops(e);
+  EXPECT_EQ(result, (20 * 20 * 15 * 2));
+}
+
+TEST(Chain, CostWithProp) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
+  auto e = mul(A, B);
+  long result = getMCPFlops(e);
+  EXPECT_EQ(result, (20 * 20 * 15));
 }
 
 TEST(Chain, PropagationRules) {

@@ -31,8 +31,9 @@ using namespace matrixchain;
 int main() {
 
   shared_ptr<Expr> a(new Operand("a", {20, 20}));
-  shared_ptr<Expr> b(new Operand("b", {20, 25}));
-  auto e = mul(trans(a), mul(a, b));
+  shared_ptr<Expr> b(new Operand("b", {20, 15}));
+  vector<shared_ptr<Expr>> operands = {a, b};
+  auto e = mul(operands);
   walk(e);
   getMCPFlops(e);
   cout << "\n\n";

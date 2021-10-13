@@ -34,8 +34,13 @@ using namespace std;
 /// Generic expr of type BINARY, UNARY or OPERAND.
 class Expr {
 public:
-  enum class ExprKind { BINARY, UNARY, OPERAND };
-  enum class ExprProperty { UPPER_TRIANGULAR, LOWER_TRIANGULAR };
+  enum class ExprKind { BINARY, UNARY, OPERAND, NARY };
+  enum class ExprProperty {
+    UPPER_TRIANGULAR,
+    LOWER_TRIANGULAR,
+    SQUARE,
+    SYMMETRIC
+  };
 
 private:
   const ExprKind kind;
@@ -51,6 +56,8 @@ public:
   virtual void inferProperties() = 0;
   virtual bool isUpperTriangular() = 0;
   virtual bool isLowerTriangular() = 0;
+  virtual bool isSquare() = 0;
+  virtual bool isSymmetric() = 0;
 
 protected:
   Expr() = delete;
@@ -78,8 +85,34 @@ public:
   shared_ptr<Expr> getRightChild() { return childRight; };
   bool isUpperTriangular();
   bool isLowerTriangular();
+  bool isSquare();
+  bool isSymmetric();
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
+  };
+};
+
+/// N-ary operation (i.e., MUL)
+class NaryOp : public Expr {
+public:
+  enum class NaryOpKind { MUL };
+
+private:
+  vector<shared_ptr<Expr>> children;
+  NaryOpKind kind;
+
+public:
+  NaryOp() = delete;
+  NaryOp(vector<shared_ptr<Expr>> children)
+      : Expr(ExprKind::NARY), children(children){};
+  NaryOpKind getKind() { return kind; };
+  vector<shared_ptr<Expr>> getChildren() { return children; };
+  bool isUpperTriangular();
+  bool isLowerTriangular();
+  bool isSquare() { return false; };
+  bool isSymmetric() { return false; };
+  static bool classof(const Expr *expr) {
+    return expr->getKind() == ExprKind::NARY;
   };
 };
 
@@ -99,6 +132,8 @@ public:
   void inferProperties();
   shared_ptr<Expr> getChild() { return child; };
   UnaryOpKind getKind() { return kind; };
+  bool isSquare();
+  bool isSymmetric();
   bool isUpperTriangular();
   bool isLowerTriangular();
   static bool classof(const Expr *expr) {
@@ -125,6 +160,8 @@ public:
   void inferProperties(){};
   bool isUpperTriangular();
   bool isLowerTriangular();
+  bool isSquare();
+  bool isSymmetric();
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   };
@@ -138,6 +175,7 @@ using namespace matrixchain;
 // Exposed methods.
 void walk(shared_ptr<Expr> node, int level = 0);
 shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right);
+shared_ptr<Expr> mul(vector<shared_ptr<Expr>> operands);
 shared_ptr<Expr> inv(shared_ptr<Expr> child);
 shared_ptr<Expr> trans(shared_ptr<Expr> child);
 
