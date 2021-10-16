@@ -17,6 +17,8 @@ add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
 
 add_library(matrixChain
   chain.cpp
+  properties.cpp
+  utils.cpp
 )
 
 add_executable(main

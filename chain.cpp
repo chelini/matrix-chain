@@ -6,149 +6,7 @@
 
 using namespace matrixchain;
 
-bool NaryOp::isUpperTriangular() {
-  return std::all_of(
-      this->getChildren().begin(), this->getChildren().end(),
-      [](shared_ptr<Expr> child) { return child->isUpperTriangular(); });
-}
-
-bool NaryOp::isLowerTriangular() {
-  return std::all_of(
-      this->getChildren().begin(), this->getChildren().end(),
-      [](shared_ptr<Expr> child) { return child->isLowerTriangular(); });
-}
-
-bool BinaryOp::isUpperTriangular() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isUpperTriangular() && childRight->isUpperTriangular();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool BinaryOp::isLowerTriangular() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isLowerTriangular() && childRight->isLowerTriangular();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool BinaryOp::isSquare() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isSquare() && childRight->isSquare();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool BinaryOp::isSymmetric() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isSymmetric() && childRight->isSymmetric();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool UnaryOp::isUpperTriangular() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case UnaryOp::UnaryOpKind::TRANSPOSE:
-    return child->isLowerTriangular();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool UnaryOp::isLowerTriangular() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case UnaryOp::UnaryOpKind::TRANSPOSE:
-    return child->isUpperTriangular();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool UnaryOp::isSquare() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case UnaryOp::UnaryOpKind::TRANSPOSE:
-    return child->isSquare();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool UnaryOp::isSymmetric() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case UnaryOp::UnaryOpKind::TRANSPOSE:
-    return child->isSymmetric();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
-
-bool Operand::isUpperTriangular() {
-  return std::any_of(inferredProperties.begin(), inferredProperties.end(),
-                     [](Expr::ExprProperty p) {
-                       return p == Expr::ExprProperty::UPPER_TRIANGULAR;
-                     });
-}
-
-bool Operand::isLowerTriangular() {
-  return std::any_of(inferredProperties.begin(), inferredProperties.end(),
-                     [](Expr::ExprProperty p) {
-                       return p == Expr::ExprProperty::LOWER_TRIANGULAR;
-                     });
-}
-
-bool Operand::isSquare() {
-  return std::any_of(
-      inferredProperties.begin(), inferredProperties.end(),
-      [](Expr::ExprProperty p) { return p == Expr::ExprProperty::SQUARE; });
-}
-
-bool Operand::isSymmetric() {
-  return std::any_of(
-      inferredProperties.begin(), inferredProperties.end(),
-      [](Expr::ExprProperty p) { return p == Expr::ExprProperty::SYMMETRIC; });
-}
-
-/// infer properties for UnaryExpr.
-void UnaryOp::inferProperties() {
-  /*
-  UnaryOpKind kind = this->getKind();
-  switch (kind) {
-  case UnaryOpKind::TRANSPOSE: {
-    if (this->isUpperTriangular())
-      return {Expr::ExprProperty::UPPER_TRIANGULAR};
-    return {};
-  }
-  default:
-    assert(0 && "not handled");
-  }
-  assert(0 && "unreachable");
-  return {};
-  */
-}
+void UnaryOp::inferProperties() { return; }
 
 void BinaryOp::inferProperties() { return; }
 
@@ -332,7 +190,7 @@ static void print(vector<vector<shared_ptr<Expr>>> &tmps,
 }
 #endif
 
-// TODO: n-ary how to handle?
+// TODO: n-ary how to handle? Do we need to?
 static pair<long, long> getKernelCost(shared_ptr<Expr> node, long &cost) {
   if (node) {
     if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {

@@ -16,6 +16,7 @@ TEST(Chain, MCP) {
   EXPECT_EQ(result, 30250);
 }
 
+// Expect cost to be n^2 * m * 2 -> 20 * 20 * 15 * 2
 TEST(Chain, Cost) {
   shared_ptr<Expr> A(new Operand("A", {20, 20}));
   shared_ptr<Expr> B(new Operand("B", {20, 15}));
@@ -24,21 +25,80 @@ TEST(Chain, Cost) {
   EXPECT_EQ(result, (20 * 20 * 15) << 1);
 }
 
-TEST(Chain, CostWithProp) {
+// Expect cost to be n^2 * m as A is lower triangular
+// lower triangular are square, verify?
+TEST(Chain, CostWithProperty) {
   shared_ptr<Expr> A(new Operand("A", {20, 20}));
   shared_ptr<Expr> B(new Operand("B", {20, 15}));
   A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
-  auto e = mul(A, B);
-  long result = getMCPFlops(e);
+  auto M = mul(A, B);
+  long result = getMCPFlops(M);
   EXPECT_EQ(result, (20 * 20 * 15));
 }
 
-TEST(Chain, PropagationRules) {
-  shared_ptr<Expr> a(new Operand("A", {20, 20}));
-  a->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
-  shared_ptr<Expr> b(new Operand("B", {20, 20}));
-  b->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
+// The product of two upper (lower) triangular matrices is upper (lower)
+// triangular matrix.
+TEST(Chain, PropagationRulesUpperTimesUpper) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
+  shared_ptr<Expr> B(new Operand("B", {20, 20}));
+  B->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
+  auto M = mul(A, B);
+  EXPECT_EQ(M->isUpperTriangular(), true);
+}
 
-  auto e = mul(a, trans(b));
-  EXPECT_EQ(e->isLowerTriangular(), true);
+TEST(Chain, PropagationRulesLowerTimesLower) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
+  shared_ptr<Expr> B(new Operand("B", {20, 20}));
+  B->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
+  auto aTimesB = mul(A, B);
+  EXPECT_EQ(aTimesB->isLowerTriangular(), true);
+  auto aTimesBTransTrans = mul(A, trans(trans(B)));
+  EXPECT_EQ(aTimesBTransTrans->isLowerTriangular(), true);
+  auto aTransTransTimesB = mul(trans(trans(A)), B);
+  EXPECT_EQ(aTransTransTimesB->isLowerTriangular(), true);
+}
+
+// If you transpose an upper (lower) triangular matrix, you get a lower (upper)
+// triangular matrix.
+TEST(Chain, PropagationRulesTransposeUpper) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
+  auto T = trans(A);
+  EXPECT_EQ(T->isLowerTriangular(), true);
+}
+
+TEST(Chain, PropagationRulesTransposeLower) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
+  auto T = trans(A);
+  EXPECT_EQ(T->isUpperTriangular(), true);
+}
+
+TEST(Chain, PropagationRulesTransposeMultipleTimes) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
+  auto T = trans(trans(A));
+  EXPECT_EQ(T->isUpperTriangular(), true);
+  T = trans(trans(trans(A)));
+  EXPECT_EQ(T->isLowerTriangular(), true);
+}
+
+TEST(Chain, PropagationRulesIsFullRank) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::FULL_RANK});
+  auto T = trans(A);
+  EXPECT_EQ(T->isFullRank(), true);
+  auto I = inv(A);
+  EXPECT_EQ(I->isFullRank(), true);
+  auto IT = inv(trans(A));
+  EXPECT_EQ(IT->isFullRank(), true);
+}
+
+TEST(Chain, PropagationRulesIsSPD) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  A->setProperties({Expr::ExprProperty::FULL_RANK});
+  auto SPD = mul(trans(A), A);
+  EXPECT_EQ(SPD->isSPD(), true);
 }

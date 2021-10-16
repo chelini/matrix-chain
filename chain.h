@@ -39,7 +39,9 @@ public:
     UPPER_TRIANGULAR,
     LOWER_TRIANGULAR,
     SQUARE,
-    SYMMETRIC
+    SYMMETRIC,
+    FULL_RANK,
+    SPD
   };
 
 private:
@@ -54,10 +56,15 @@ public:
     assert(0 && "can set properties only for operands");
   };
   virtual void inferProperties() = 0;
+
   virtual bool isUpperTriangular() = 0;
   virtual bool isLowerTriangular() = 0;
   virtual bool isSquare() = 0;
   virtual bool isSymmetric() = 0;
+  virtual bool isFullRank() = 0;
+  virtual bool isSPD() = 0;
+
+  bool isTransposeOf(shared_ptr<Expr> right);
 
 protected:
   Expr() = delete;
@@ -87,6 +94,8 @@ public:
   bool isLowerTriangular();
   bool isSquare();
   bool isSymmetric();
+  bool isFullRank();
+  bool isSPD();
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
   };
@@ -111,6 +120,8 @@ public:
   bool isLowerTriangular();
   bool isSquare() { return false; };
   bool isSymmetric() { return false; };
+  bool isFullRank() { return false; };
+  bool isSPD() { return false; };
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::NARY;
   };
@@ -136,6 +147,8 @@ public:
   bool isSymmetric();
   bool isUpperTriangular();
   bool isLowerTriangular();
+  bool isFullRank();
+  bool isSPD();
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
   };
@@ -162,6 +175,8 @@ public:
   bool isLowerTriangular();
   bool isSquare();
   bool isSymmetric();
+  bool isFullRank();
+  bool isSPD();
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   };
