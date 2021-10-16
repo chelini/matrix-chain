@@ -21,7 +21,7 @@ TEST(Chain, Cost) {
   shared_ptr<Expr> B(new Operand("B", {20, 15}));
   auto e = mul(A, B);
   long result = getMCPFlops(e);
-  EXPECT_EQ(result, (20 * 20 * 15 * 2));
+  EXPECT_EQ(result, (20 * 20 * 15) << 1);
 }
 
 TEST(Chain, CostWithProp) {

@@ -400,9 +400,9 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
       m[i][j] = std::numeric_limits<long>::max();
       for (size_t k = i; k <= j - 1; k++) {
 
+        auto tmpexpr = mul(tmps[i][k], tmps[k + 1][j]);
 #if DEBUG
         cout << "---\n";
-        auto tmpexpr = mul(tmps[i][k], tmps[k + 1][j]);
         walk(tmpexpr);
         cout << "\n---\n\n";
 #endif
