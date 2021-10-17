@@ -194,6 +194,10 @@ shared_ptr<Expr> mul(vector<shared_ptr<Expr>> operands);
 shared_ptr<Expr> inv(shared_ptr<Expr> child);
 shared_ptr<Expr> trans(shared_ptr<Expr> child);
 
+// Exposed for debug only.
+void getKernelCostTopLevelExpr(shared_ptr<Expr> node, long &cost);
+void getKernelCostFullExpr(shared_ptr<Expr> node, long &cost);
+
 long getMCPFlops(shared_ptr<Expr> &expr);
 
 #endif

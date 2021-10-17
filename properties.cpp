@@ -1,3 +1,25 @@
+/*
+Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "chain.h"
 #include "llvm/Support/Casting.h"
 #include <algorithm>
@@ -63,7 +85,7 @@ bool UnaryOp::isSymmetric() {
   auto kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE:
-    return child->isSymmetric();
+    return child->isSymmetric() || child->isSPD();
   default:
     assert(0 && "UNK");
   }
@@ -111,30 +133,13 @@ bool BinaryOp::isLowerTriangular() {
   return false;
 }
 
-bool BinaryOp::isSquare() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isSquare() && childRight->isSquare();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
+bool BinaryOp::isSquare() { assert(0 && "no impl"); }
 
-bool BinaryOp::isSymmetric() {
-  auto kind = this->getKind();
-  switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isSymmetric() && childRight->isSymmetric();
-  default:
-    assert(0 && "UNK");
-  }
-  return false;
-}
+// TODO: what other cases?
+bool BinaryOp::isSymmetric() { return this->isSPD(); }
 
 bool BinaryOp::isFullRank() {
-  assert(0 && "no impl");
+  // assert(0 && "no impl");
   return false;
 }
 

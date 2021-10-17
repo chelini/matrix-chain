@@ -11,8 +11,8 @@ TEST(Chain, MCP) {
   shared_ptr<Expr> D(new Operand("A4", {5, 10}));
   shared_ptr<Expr> E(new Operand("A5", {10, 20}));
   shared_ptr<Expr> F(new Operand("A6", {20, 25}));
-  auto e = mul(A, mul(B, mul(C, mul(D, mul(E, F)))));
-  long result = getMCPFlops(e);
+  auto G = mul(A, mul(B, mul(C, mul(D, mul(E, F)))));
+  long result = getMCPFlops(G);
   EXPECT_EQ(result, 30250);
 }
 
@@ -20,8 +20,8 @@ TEST(Chain, MCP) {
 TEST(Chain, Cost) {
   shared_ptr<Expr> A(new Operand("A", {20, 20}));
   shared_ptr<Expr> B(new Operand("B", {20, 15}));
-  auto e = mul(A, B);
-  long result = getMCPFlops(e);
+  auto E = mul(A, B);
+  long result = getMCPFlops(E);
   EXPECT_EQ(result, (20 * 20 * 15) << 1);
 }
 
@@ -101,4 +101,26 @@ TEST(Chain, PropagationRulesIsSPD) {
   A->setProperties({Expr::ExprProperty::FULL_RANK});
   auto SPD = mul(trans(A), A);
   EXPECT_EQ(SPD->isSPD(), true);
+}
+
+TEST(Chain, kernelCostWhenSPD) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  A->setProperties({Expr::ExprProperty::FULL_RANK});
+  long cost = 0;
+  auto E = mul(mul(trans(A), A), B);
+  getKernelCostTopLevelExpr(E, cost);
+  EXPECT_EQ(cost, 6000);
+  cost = 0;
+  getKernelCostFullExpr(E, cost);
+  EXPECT_EQ(cost, 22000);
+}
+
+TEST(Chain, CountFlopsIsSPD) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  A->setProperties({Expr::ExprProperty::FULL_RANK});
+  auto E = mul(mul(trans(A), A), B);
+  auto result = getMCPFlops(E);
+  EXPECT_EQ(result, 22000);
 }
