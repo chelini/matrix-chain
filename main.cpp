@@ -28,14 +28,4 @@ using namespace matrixchain;
 
 // TODO: RTTI: We shoud avoid getting the raw pointer
 // from a shared_ptr<Expr>
-int main() {
-
-  shared_ptr<Expr> a(new Operand("a", {20, 20}));
-  shared_ptr<Expr> b(new Operand("b", {20, 15}));
-  vector<shared_ptr<Expr>> operands = {a, b};
-  auto e = mul(operands);
-  walk(e);
-  getMCPFlops(e);
-  cout << "\n\n";
-  return 0;
-}
+int main() { return 0; }

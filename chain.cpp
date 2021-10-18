@@ -118,21 +118,12 @@ void walk(shared_ptr<Expr> node, int level) {
 }
 
 /// Multiply two expressions.
-shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right) {
+shared_ptr<Expr> details::binaryMul(shared_ptr<Expr> left,
+                                    shared_ptr<Expr> right) {
   assert(left && "left expr must be non null");
   assert(right && "right expr must be non null");
   return shared_ptr<Expr>(
       new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
-}
-
-shared_ptr<Expr> mul(vector<shared_ptr<Expr>> operands) {
-  assert(operands.size() >= 1 && "one or more mul");
-  if (operands.size() == 1)
-    return operands[0];
-  auto result = operands[0];
-  for (size_t i = 1; i < operands.size(); i++)
-    result = mul(result, operands[i]);
-  return result;
 }
 
 /// invert an expression.

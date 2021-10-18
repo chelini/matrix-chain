@@ -16,6 +16,18 @@ TEST(Chain, MCP) {
   EXPECT_EQ(result, 30250);
 }
 
+TEST(Chain, MCPVariadicMul) {
+  shared_ptr<Expr> A(new Operand("A1", {30, 35}));
+  shared_ptr<Expr> B(new Operand("A2", {35, 15}));
+  shared_ptr<Expr> C(new Operand("A3", {15, 5}));
+  shared_ptr<Expr> D(new Operand("A4", {5, 10}));
+  shared_ptr<Expr> E(new Operand("A5", {10, 20}));
+  shared_ptr<Expr> F(new Operand("A6", {20, 25}));
+  auto G = mul(A, B, C, D, E, F);
+  long result = getMCPFlops(G);
+  EXPECT_EQ(result, 30250);
+}
+
 // Expect cost to be n^2 * m * 2 -> 20 * 20 * 15 * 2
 TEST(Chain, Cost) {
   shared_ptr<Expr> A(new Operand("A", {20, 20}));
@@ -133,5 +145,8 @@ TEST(Chain, CountFlopsIsSymmetric) {
   EXPECT_EQ(result, 22000);
   auto F = mul(mul(A, trans(A)), B);
   result = getMCPFlops(F);
+  EXPECT_EQ(result, 22000);
+  auto G = mul(A, trans(A), B);
+  result = getMCPFlops(G);
   EXPECT_EQ(result, 22000);
 }

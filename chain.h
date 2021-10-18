@@ -187,17 +187,44 @@ public:
 using namespace std;
 using namespace matrixchain;
 
+namespace {
+template <typename... Args>
+vector<typename std::common_type<Args...>::type> varargToVector(Args... args) {
+  vector<typename std::common_type<Args...>::type> result;
+  result.reserve(sizeof...(Args));
+  for (auto arg :
+       {static_cast<typename std::common_type<Args...>::type>(args)...}) {
+    result.emplace_back(arg);
+  }
+  return result;
+}
+} // end namespace
+
 // Exposed methods.
 void walk(shared_ptr<Expr> node, int level = 0);
-shared_ptr<Expr> mul(shared_ptr<Expr> left, shared_ptr<Expr> right);
-shared_ptr<Expr> mul(vector<shared_ptr<Expr>> operands);
 shared_ptr<Expr> inv(shared_ptr<Expr> child);
 shared_ptr<Expr> trans(shared_ptr<Expr> child);
+long getMCPFlops(shared_ptr<Expr> &expr);
+
+namespace details {
+shared_ptr<Expr> binaryMul(shared_ptr<Expr> left, shared_ptr<Expr> right);
+}
+
+// Exposed method: Variadic Mul.
+template <typename Arg, typename... Args>
+shared_ptr<Expr> mul(Arg arg, Args... args) {
+  auto operands = varargToVector<shared_ptr<Expr>>(arg, args...);
+  assert(operands.size() >= 1 && "one or more mul");
+  if (operands.size() == 1)
+    return operands[0];
+  auto result = operands[0];
+  for (size_t i = 1; i < operands.size(); i++)
+    result = details::binaryMul(result, operands[i]);
+  return result;
+}
 
 // Exposed for debug only.
 void getKernelCostTopLevelExpr(shared_ptr<Expr> node, long &cost);
 void getKernelCostFullExpr(shared_ptr<Expr> node, long &cost);
-
-long getMCPFlops(shared_ptr<Expr> &expr);
 
 #endif
