@@ -135,8 +135,7 @@ bool BinaryOp::isLowerTriangular() {
 
 bool BinaryOp::isSquare() { assert(0 && "no impl"); }
 
-// TODO: what other cases?
-bool BinaryOp::isSymmetric() { return this->isSPD(); }
+bool BinaryOp::isSymmetric() { return childLeft->isTransposeOf(childRight); }
 
 bool BinaryOp::isFullRank() {
   // assert(0 && "no impl");
@@ -150,7 +149,7 @@ bool BinaryOp::isSPD() {
   auto kind = this->getKind();
   switch (kind) {
   case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isFullRank() && childLeft->isTransposeOf(childRight);
+    return childLeft->isFullRank() && this->isSymmetric();
   default:
     assert(0 && "UNK");
   }

@@ -124,3 +124,14 @@ TEST(Chain, CountFlopsIsSPD) {
   auto result = getMCPFlops(E);
   EXPECT_EQ(result, 22000);
 }
+
+TEST(Chain, CountFlopsIsSymmetric) {
+  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  auto E = mul(mul(trans(A), A), B);
+  auto result = getMCPFlops(E);
+  EXPECT_EQ(result, 22000);
+  auto F = mul(mul(A, trans(A)), B);
+  result = getMCPFlops(F);
+  EXPECT_EQ(result, 22000);
+}
