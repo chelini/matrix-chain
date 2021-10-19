@@ -157,7 +157,7 @@ bool BinaryOp::isSPD() {
 }
 
 // ----------------------------------------------------------------------
-
+/*
 bool NaryOp::isUpperTriangular() {
   return std::all_of(
       this->getChildren().begin(), this->getChildren().end(),
@@ -169,3 +169,4 @@ bool NaryOp::isLowerTriangular() {
       this->getChildren().begin(), this->getChildren().end(),
       [](shared_ptr<Expr> child) { return child->isLowerTriangular(); });
 }
+*/

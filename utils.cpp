@@ -24,18 +24,18 @@ SOFTWARE.
 #include "llvm/Support/Casting.h"
 #include <iostream>
 
-bool Expr::isTransposeOf(shared_ptr<Expr> right) {
+bool Expr::isTransposeOf(Expr *right) {
   // trans(left), right with *left == *right
   if (auto t = llvm::dyn_cast_or_null<UnaryOp>(this)) {
     if (t->getKind() != UnaryOp::UnaryOpKind::TRANSPOSE)
       return false;
-    return t->getChild().get() == right.get();
+    return t->getChild() == right;
   }
   // left, trans(right) with *left == *right
-  if (auto t = llvm::dyn_cast_or_null<UnaryOp>(right.get())) {
+  if (auto t = llvm::dyn_cast_or_null<UnaryOp>(right)) {
     if (t->getKind() != UnaryOp::UnaryOpKind::TRANSPOSE)
       return false;
-    return t->getChild().get() == this;
+    return t->getChild() == this;
   }
   return false;
 }

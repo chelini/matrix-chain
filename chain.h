@@ -27,6 +27,8 @@ SOFTWARE.
 #include <memory>
 #include <vector>
 
+#include <iostream>
+
 namespace matrixchain {
 
 using namespace std;
@@ -55,7 +57,9 @@ public:
   virtual void setProperties(vector<Expr::ExprProperty> properties) {
     assert(0 && "can set properties only for operands");
   };
-  virtual void inferProperties() = 0;
+  virtual ~Expr(){};
+
+  virtual Expr *clone() const = 0;
 
   virtual bool isUpperTriangular() = 0;
   virtual bool isLowerTriangular() = 0;
@@ -64,7 +68,7 @@ public:
   virtual bool isFullRank() = 0;
   virtual bool isSPD() = 0;
 
-  bool isTransposeOf(shared_ptr<Expr> right);
+  bool isTransposeOf(Expr *right);
 
 protected:
   Expr() = delete;
@@ -77,55 +81,72 @@ public:
   enum class BinaryOpKind { MUL };
 
 private:
-  shared_ptr<Expr> childLeft;
-  shared_ptr<Expr> childRight;
+  Expr *childLeft;
+  Expr *childRight;
   BinaryOpKind kind;
 
 public:
   BinaryOp() = delete;
-  BinaryOp(shared_ptr<Expr> left, shared_ptr<Expr> right, BinaryOpKind kind)
+  ~BinaryOp() {
+    delete childLeft;
+    delete childRight;
+  };
+
+  BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
       : Expr(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
-  BinaryOpKind getKind() { return kind; };
-  void inferProperties();
-  shared_ptr<Expr> getLeftChild() { return childLeft; };
-  shared_ptr<Expr> getRightChild() { return childRight; };
+  BinaryOp(const BinaryOp &binaryOp) : Expr(binaryOp) {
+    childLeft = binaryOp.getLeftChild()->clone();
+    childRight = binaryOp.getRightChild()->clone();
+    kind = binaryOp.getKind();
+  }
+
+  BinaryOpKind getKind() const { return kind; };
+  Expr *getLeftChild() const { return childLeft; };
+  Expr *getRightChild() const { return childRight; };
+  BinaryOp *clone() const { return new BinaryOp(*this); };
+
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare();
   bool isSymmetric();
   bool isFullRank();
   bool isSPD();
+
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
   };
 };
 
+/*
 /// N-ary operation (i.e., MUL)
 class NaryOp : public Expr {
 public:
   enum class NaryOpKind { MUL };
 
 private:
-  vector<shared_ptr<Expr>> children;
+  vector<unique_ptr<Expr>> children;
   NaryOpKind kind;
 
 public:
   NaryOp() = delete;
-  NaryOp(vector<shared_ptr<Expr>> children)
+  NaryOp(vector<Expr*> children)
       : Expr(ExprKind::NARY), children(children){};
   NaryOpKind getKind() { return kind; };
-  vector<shared_ptr<Expr>> getChildren() { return children; };
+  vector<unique_ptr<Expr>> getChildren() { return children; };
+
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare() { return false; };
   bool isSymmetric() { return false; };
   bool isFullRank() { return false; };
   bool isSPD() { return false; };
+
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::NARY;
   };
 };
+*/
 
 /// Unary operation like transpose or inverse.
 class UnaryOp : public Expr {
@@ -133,22 +154,30 @@ public:
   enum class UnaryOpKind { TRANSPOSE, INVERSE };
 
 private:
-  shared_ptr<Expr> child;
+  Expr *child;
   UnaryOpKind kind;
 
 public:
   UnaryOp() = delete;
-  UnaryOp(shared_ptr<Expr> child, UnaryOpKind kind)
+  ~UnaryOp() { delete child; };
+  UnaryOp(Expr *child, UnaryOpKind kind)
       : Expr(ExprKind::UNARY), child(child), kind(kind){};
-  void inferProperties();
-  shared_ptr<Expr> getChild() { return child; };
-  UnaryOpKind getKind() { return kind; };
+  UnaryOp(const UnaryOp &unaryOp) : Expr(unaryOp) {
+    child = unaryOp.getChild()->clone();
+    kind = unaryOp.getKind();
+  }
+
+  Expr *getChild() const { return child; };
+  UnaryOpKind getKind() const { return kind; };
+  UnaryOp *clone() const { return new UnaryOp(*this); };
+
   bool isSquare();
   bool isSymmetric();
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isFullRank();
   bool isSPD();
+
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
   };
@@ -162,21 +191,29 @@ private:
 
 public:
   Operand() = delete;
+  ~Operand(){};
   Operand(string name, vector<int> shape)
       : Expr(ExprKind::OPERAND), name(name), shape(shape){};
+  Operand(const Operand &) = default;
+
   string getName() { return name; };
   vector<int> getShape() { return shape; };
   vector<Expr::ExprProperty> getProperties() { return inferredProperties; };
   void setProperties(vector<Expr::ExprProperty> properties) {
     inferredProperties = properties;
   };
-  void inferProperties(){};
+  Operand *clone() const {
+    cout << "cloned operand\n";
+    return new Operand(*this);
+  };
+
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare();
   bool isSymmetric();
   bool isFullRank();
   bool isSPD();
+
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   };
@@ -201,19 +238,18 @@ vector<typename std::common_type<Args...>::type> varargToVector(Args... args) {
 } // end namespace
 
 // Exposed methods.
-void walk(shared_ptr<Expr> node, int level = 0);
-shared_ptr<Expr> inv(shared_ptr<Expr> child);
-shared_ptr<Expr> trans(shared_ptr<Expr> child);
-long getMCPFlops(shared_ptr<Expr> &expr);
+void walk(Expr *node, int level = 0);
+Expr *inv(Expr *child);
+Expr *trans(Expr *child);
+long getMCPFlops(Expr *expr);
 
 namespace details {
-shared_ptr<Expr> binaryMul(shared_ptr<Expr> left, shared_ptr<Expr> right);
+Expr *binaryMul(Expr *left, Expr *right);
 }
 
 // Exposed method: Variadic Mul.
-template <typename Arg, typename... Args>
-shared_ptr<Expr> mul(Arg arg, Args... args) {
-  auto operands = varargToVector<shared_ptr<Expr>>(arg, args...);
+template <typename Arg, typename... Args> Expr *mul(Arg arg, Args... args) {
+  auto operands = varargToVector<Expr *>(arg, args...);
   assert(operands.size() >= 1 && "one or more mul");
   if (operands.size() == 1)
     return operands[0];
@@ -224,7 +260,7 @@ shared_ptr<Expr> mul(Arg arg, Args... args) {
 }
 
 // Exposed for debug only.
-void getKernelCostTopLevelExpr(shared_ptr<Expr> node, long &cost);
-void getKernelCostFullExpr(shared_ptr<Expr> node, long &cost);
+// void getKernelCostTopLevelExpr(Expr *node, long &cost);
+// void getKernelCostFullExpr(Expr *node, long &cost);
 
 #endif
