@@ -29,5 +29,8 @@ target_include_directories(matrixChain PUBLIC ${CMAKE_SOURCE_DIR})
 
 target_link_libraries(main matrixChain)
 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+include(sanitizers)
+
 add_subdirectory(test)
 #add_subdirectory(docs)
