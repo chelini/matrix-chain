@@ -28,12 +28,14 @@ TEST(Chain, MCPVariadicMul) {
   long result = getMCPFlops(G);
   EXPECT_EQ(result, 30250);
 }
+*/
 
 // Expect cost to be n^2 * m * 2 -> 20 * 20 * 15 * 2
 TEST(Chain, Cost) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
-  shared_ptr<Expr> B(new Operand("B", {20, 15}));
-  auto E = mul(A, B);
+  details::ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *B = new Operand("B", {20, 15});
+  auto *E = mul(A, B);
   long result = getMCPFlops(E);
   EXPECT_EQ(result, (20 * 20 * 15) << 1);
 }
@@ -41,10 +43,11 @@ TEST(Chain, Cost) {
 // Expect cost to be n^2 * m as A is lower triangular
 // lower triangular are square, verify?
 TEST(Chain, CostWithProperty) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
-  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *B = new Operand("B", {20, 15});
   A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
-  auto M = mul(A, B);
+  auto *M = mul(A, B);
   long result = getMCPFlops(M);
   EXPECT_EQ(result, (20 * 20 * 15));
 }
@@ -52,18 +55,20 @@ TEST(Chain, CostWithProperty) {
 // The product of two upper (lower) triangular matrices is upper (lower)
 // triangular matrix.
 TEST(Chain, PropagationRulesUpperTimesUpper) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
-  shared_ptr<Expr> B(new Operand("B", {20, 20}));
+  auto *B = new Operand("B", {20, 20});
   B->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
-  auto M = mul(A, B);
+  auto *M = mul(A, B);
   EXPECT_EQ(M->isUpperTriangular(), true);
 }
 
 TEST(Chain, PropagationRulesLowerTimesLower) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
-  shared_ptr<Expr> B(new Operand("B", {20, 20}));
+  auto *B = new Operand("B", {20, 20});
   B->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
   auto aTimesB = mul(A, B);
   EXPECT_EQ(aTimesB->isLowerTriangular(), true);
@@ -76,21 +81,24 @@ TEST(Chain, PropagationRulesLowerTimesLower) {
 // If you transpose an upper (lower) triangular matrix, you get a lower (upper)
 // triangular matrix.
 TEST(Chain, PropagationRulesTransposeUpper) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
   auto T = trans(A);
   EXPECT_EQ(T->isLowerTriangular(), true);
 }
 
 TEST(Chain, PropagationRulesTransposeLower) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::LOWER_TRIANGULAR});
   auto T = trans(A);
   EXPECT_EQ(T->isUpperTriangular(), true);
 }
 
 TEST(Chain, PropagationRulesTransposeMultipleTimes) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::UPPER_TRIANGULAR});
   auto T = trans(trans(A));
   EXPECT_EQ(T->isUpperTriangular(), true);
@@ -99,7 +107,8 @@ TEST(Chain, PropagationRulesTransposeMultipleTimes) {
 }
 
 TEST(Chain, PropagationRulesIsFullRank) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::FULL_RANK});
   auto T = trans(A);
   EXPECT_EQ(T->isFullRank(), true);
@@ -110,15 +119,17 @@ TEST(Chain, PropagationRulesIsFullRank) {
 }
 
 TEST(Chain, PropagationRulesIsSPD) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
   A->setProperties({Expr::ExprProperty::FULL_RANK});
   auto SPD = mul(trans(A), A);
   EXPECT_EQ(SPD->isSPD(), true);
 }
 
 TEST(Chain, kernelCostWhenSPD) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
-  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *B = new Operand("B", {20, 15});
   A->setProperties({Expr::ExprProperty::FULL_RANK});
   long cost = 0;
   auto E = mul(mul(trans(A), A), B);
@@ -130,8 +141,9 @@ TEST(Chain, kernelCostWhenSPD) {
 }
 
 TEST(Chain, CountFlopsIsSPD) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
-  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *B = new Operand("B", {20, 15});
   A->setProperties({Expr::ExprProperty::FULL_RANK});
   auto E = mul(mul(trans(A), A), B);
   auto result = getMCPFlops(E);
@@ -139,8 +151,9 @@ TEST(Chain, CountFlopsIsSPD) {
 }
 
 TEST(Chain, CountFlopsIsSymmetric) {
-  shared_ptr<Expr> A(new Operand("A", {20, 20}));
-  shared_ptr<Expr> B(new Operand("B", {20, 15}));
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *B = new Operand("B", {20, 15});
   auto E = mul(mul(trans(A), A), B);
   auto result = getMCPFlops(E);
   EXPECT_EQ(result, 22000);
@@ -151,4 +164,3 @@ TEST(Chain, CountFlopsIsSymmetric) {
   result = getMCPFlops(G);
   EXPECT_EQ(result, 22000);
 }
-*/
