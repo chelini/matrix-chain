@@ -86,7 +86,8 @@ public:
   virtual bool isFullRank() = 0;
   virtual bool isSPD() = 0;
 
-  bool isTransposeOf(Expr *right);
+  bool isTransposeOf(const Expr *right);
+  bool isSame(const Expr *right);
 
 protected:
   Expr() = delete;
@@ -121,7 +122,7 @@ public:
   BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
       : AutoRef(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
-  BinaryOpKind getKind() { return kind; };
+  BinaryOpKind getKind() const { return kind; };
   void inferProperties();
   Expr *getLeftChild() const { return childLeft; };
   Expr *getRightChild() const { return childRight; };
@@ -135,22 +136,21 @@ public:
     return expr->getKind() == ExprKind::BINARY;
   };
 };
-/*
+
 /// N-ary operation (i.e., MUL)
 class NaryOp : public Expr {
 public:
   enum class NaryOpKind { MUL };
 
 private:
-  vector<shared_ptr<Expr>> children;
+  vector<Expr *> children;
   NaryOpKind kind;
 
 public:
   NaryOp() = delete;
-  NaryOp(vector<shared_ptr<Expr>> children)
-      : Expr(ExprKind::NARY), children(children){};
+  NaryOp(vector<Expr *> children) : Expr(ExprKind::NARY), children(children){};
   NaryOpKind getKind() { return kind; };
-  vector<shared_ptr<Expr>> getChildren() { return children; };
+  vector<Expr *> getChildren() { return children; };
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare() { return false; };
@@ -161,7 +161,7 @@ public:
     return expr->getKind() == ExprKind::NARY;
   };
 };
-*/
+
 /// Unary operation like transpose or inverse.
 class UnaryOp : public AutoRef<UnaryOp> {
 public:
@@ -177,7 +177,7 @@ public:
       : AutoRef(ExprKind::UNARY), child(child), kind(kind){};
   void inferProperties();
   Expr *getChild() const { return child; };
-  UnaryOpKind getKind() { return kind; };
+  UnaryOpKind getKind() const { return kind; };
   bool isSquare();
   bool isSymmetric();
   bool isUpperTriangular();

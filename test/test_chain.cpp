@@ -16,19 +16,19 @@ TEST(Chain, MCP) {
   long result = getMCPFlops(G);
   EXPECT_EQ(result, 30250);
 }
-/*
+
 TEST(Chain, MCPVariadicMul) {
-  shared_ptr<Expr> A(new Operand("A1", {30, 35}));
-  shared_ptr<Expr> B(new Operand("A2", {35, 15}));
-  shared_ptr<Expr> C(new Operand("A3", {15, 5}));
-  shared_ptr<Expr> D(new Operand("A4", {5, 10}));
-  shared_ptr<Expr> E(new Operand("A5", {10, 20}));
-  shared_ptr<Expr> F(new Operand("A6", {20, 25}));
+  details::ScopedContext ctx;
+  auto *A = new Operand("A1", {30, 35});
+  auto *B = new Operand("A2", {35, 15});
+  auto *C = new Operand("A3", {15, 5});
+  auto *D = new Operand("A4", {5, 10});
+  auto *E = new Operand("A5", {10, 20});
+  auto *F = new Operand("A6", {20, 25});
   auto G = mul(A, B, C, D, E, F);
   long result = getMCPFlops(G);
   EXPECT_EQ(result, 30250);
 }
-*/
 
 // Expect cost to be n^2 * m * 2 -> 20 * 20 * 15 * 2
 TEST(Chain, Cost) {
@@ -163,4 +163,18 @@ TEST(Chain, CountFlopsIsSymmetric) {
   auto G = mul(A, trans(A), B);
   result = getMCPFlops(G);
   EXPECT_EQ(result, 22000);
+}
+
+TEST(Chain, areSameTree) {
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *B = new Operand("B", {20, 20});
+  auto *C = new Operand("C", {20, 20});
+  auto *exp1 = trans(mul(A, B));
+  auto *exp2 = trans(mul(A, B));
+  auto *exp3 = trans(mul(A, C));
+  bool is = exp1->isSame(exp2);
+  EXPECT_EQ(is, true);
+  is = exp1->isSame(exp3);
+  EXPECT_EQ(is, false);
 }

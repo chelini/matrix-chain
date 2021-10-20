@@ -24,7 +24,7 @@ SOFTWARE.
 #include "llvm/Support/Casting.h"
 #include <iostream>
 
-bool Expr::isTransposeOf(Expr *right) {
+bool Expr::isTransposeOf(const Expr *right) {
   // trans(left), right with *left == *right
   if (auto t = llvm::dyn_cast_or_null<UnaryOp>(this)) {
     if (t->getKind() != UnaryOp::UnaryOpKind::TRANSPOSE)
@@ -37,5 +37,45 @@ bool Expr::isTransposeOf(Expr *right) {
       return false;
     return t->getChild() == this;
   }
+  return false;
+}
+
+static bool isSameImpl(const Expr *tree1, const Expr *tree2) {
+  if (!tree1 && !tree2)
+    return true;
+
+  if (tree1 && tree2) {
+    if (tree1->getKind() != tree2->getKind())
+      return false;
+    // pt comparison for operands.
+    if (llvm::isa<Operand>(tree1)) {
+      return tree1 == tree2;
+    }
+    // unary.
+    if (llvm::isa<UnaryOp>(tree1) && llvm::isa<UnaryOp>(tree2)) {
+      const UnaryOp *tree1Op = llvm::dyn_cast_or_null<UnaryOp>(tree1);
+      const UnaryOp *tree2Op = llvm::dyn_cast_or_null<UnaryOp>(tree2);
+      return isSameImpl(tree1Op->getChild(), tree2Op->getChild());
+    }
+    // binary.
+    if (llvm::isa<BinaryOp>(tree1) && llvm::isa<BinaryOp>(tree2)) {
+      const BinaryOp *tree1Op = llvm::dyn_cast_or_null<BinaryOp>(tree1);
+      const BinaryOp *tree2Op = llvm::dyn_cast_or_null<BinaryOp>(tree2);
+      return isSameImpl(tree1Op->getLeftChild(), tree2Op->getLeftChild()) &&
+             isSameImpl(tree1Op->getRightChild(), tree2Op->getRightChild());
+    }
+  }
+  return false;
+}
+
+// return a brand new expr.
+static Expr *getCanonicalForm(const Expr *tree) { return nullptr; }
+
+bool Expr::isSame(const Expr *right) {
+  if (isSameImpl(this, right))
+    return true;
+  Expr *canonicalForm = getCanonicalForm(this);
+  if (isSameImpl(canonicalForm, right))
+    return true;
   return false;
 }

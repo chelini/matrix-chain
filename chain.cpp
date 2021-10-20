@@ -131,11 +131,11 @@ void walk(Expr *node, int level) {
       walk(unaryOp->getChild());
       cout << ")";
     } // unaryOp
-    // if (auto naryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
-    //  for (auto child : naryOp->getChildren()) {
-    //    walk(child, level + LEVEL_SPACES);
-    //  }
-    //}
+    if (auto naryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
+      for (auto child : naryOp->getChildren()) {
+        walk(child, level + LEVEL_SPACES);
+      }
+    }
     if (auto operand = llvm::dyn_cast_or_null<Operand>(node)) {
       cout << string(level, ' ') << operand->getName() << " [";
       printProperties(operand->getProperties());
