@@ -33,6 +33,34 @@ void UnaryOp::inferProperties() { return; }
 
 void BinaryOp::inferProperties() { return; }
 
+ScopedContext *&ScopedContext::getCurrentScopedContext() {
+  thread_local ScopedContext *context = nullptr;
+  return context;
+}
+
+ScopedContext::~ScopedContext() {
+  for (auto expr : liveRefs)
+    delete expr;
+}
+
+void ScopedContext::print() {
+  cout << "#live refs: " << liveRefs.size() << "\n";
+  int operands = 0;
+  int unaries = 0;
+  int binaries = 0;
+  for (Expr *expr : liveRefs) {
+    if (llvm::isa<Operand>(expr))
+      operands++;
+    if (llvm::isa<UnaryOp>(expr))
+      unaries++;
+    if (llvm::isa<BinaryOp>(expr))
+      binaries++;
+  }
+  cout << "#operands : " << operands << "\n";
+  cout << "#unaries : " << unaries << "\n";
+  cout << "#binaries : " << binaries << "\n";
+}
+
 /// print an array of expression properties.
 static void printProperties(vector<Expr::ExprProperty> properties) {
   for (size_t i = 0, e = properties.size(); i < e; i++) {

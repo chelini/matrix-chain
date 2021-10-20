@@ -25,11 +25,31 @@ SOFTWARE.
 
 #include <cassert>
 #include <memory>
+#include <set>
 #include <vector>
 
 namespace details {
 
 using namespace std;
+
+// forward decl.
+class Expr;
+
+/// Scoped context to handle deallocation.
+class ScopedContext {
+public:
+  ScopedContext() { ScopedContext::getCurrentScopedContext() = this; };
+  ~ScopedContext();
+  ScopedContext(const ScopedContext &) = delete;
+  ScopedContext &operator=(const ScopedContext &) = delete;
+
+  void insert(Expr *expr) { liveRefs.insert(expr); }
+  void print();
+  static ScopedContext *&getCurrentScopedContext();
+
+private:
+  std::set<Expr *> liveRefs;
+};
 
 /// Generic expr of type BINARY, UNARY or OPERAND.
 class Expr {
@@ -55,6 +75,8 @@ public:
   virtual void setProperties(vector<Expr::ExprProperty> properties) {
     assert(0 && "can set properties only for operands");
   };
+  // TODO: check me.
+  virtual ~Expr() = default;
   virtual void inferProperties() = 0;
 
   virtual bool isUpperTriangular() = 0;
@@ -71,8 +93,21 @@ protected:
   Expr(ExprKind kind) : kind(kind), inferredProperties({}){};
 };
 
+/// CRTP to inject
+template <class T> struct AutoRef : public Expr {
+
+private:
+  friend T;
+
+  AutoRef(Expr::ExprKind kind) : Expr(kind) {
+    auto ctx = ScopedContext::getCurrentScopedContext();
+    assert(ctx != nullptr && "ctx not available");
+    ctx->insert(static_cast<T *>(this));
+  }
+};
+
 /// Binary operation (i.e., MUL).
-class BinaryOp : public Expr {
+class BinaryOp : public AutoRef<BinaryOp> {
 public:
   enum class BinaryOpKind { MUL };
 
@@ -84,7 +119,7 @@ private:
 public:
   BinaryOp() = delete;
   BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
-      : Expr(ExprKind::BINARY), childLeft(left), childRight(right),
+      : AutoRef(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
   BinaryOpKind getKind() { return kind; };
   void inferProperties();
@@ -128,7 +163,7 @@ public:
 };
 */
 /// Unary operation like transpose or inverse.
-class UnaryOp : public Expr {
+class UnaryOp : public AutoRef<UnaryOp> {
 public:
   enum class UnaryOpKind { TRANSPOSE, INVERSE };
 
@@ -139,7 +174,7 @@ private:
 public:
   UnaryOp() = delete;
   UnaryOp(Expr *child, UnaryOpKind kind)
-      : Expr(ExprKind::UNARY), child(child), kind(kind){};
+      : AutoRef(ExprKind::UNARY), child(child), kind(kind){};
   void inferProperties();
   Expr *getChild() const { return child; };
   UnaryOpKind getKind() { return kind; };
@@ -163,7 +198,7 @@ namespace matrixchain {
 using namespace details;
 
 /// Generic operand (i.e., matrix or vector).
-class Operand : public Expr {
+class Operand : public AutoRef<Operand> {
 private:
   string name;
   vector<int> shape;
@@ -171,7 +206,7 @@ private:
 public:
   Operand() = delete;
   Operand(string name, vector<int> shape)
-      : Expr(ExprKind::OPERAND), name(name), shape(shape){};
+      : AutoRef(ExprKind::OPERAND), name(name), shape(shape){};
   string getName() { return name; };
   vector<int> getShape() { return shape; };
   vector<Expr::ExprProperty> getProperties() { return inferredProperties; };

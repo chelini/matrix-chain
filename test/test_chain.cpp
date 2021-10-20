@@ -5,6 +5,7 @@ using namespace std;
 using namespace matrixchain;
 
 TEST(Chain, MCP) {
+  details::ScopedContext ctx;
   auto *A = new Operand("A1", {30, 35});
   auto *B = new Operand("A2", {35, 15});
   auto *C = new Operand("A3", {15, 5});
