@@ -64,7 +64,7 @@ public:
   virtual bool isFullRank() = 0;
   virtual bool isSPD() = 0;
 
-  bool isTransposeOf(shared_ptr<Expr> right);
+  bool isTransposeOf(Expr *right);
 
 protected:
   Expr() = delete;
@@ -77,19 +77,19 @@ public:
   enum class BinaryOpKind { MUL };
 
 private:
-  shared_ptr<Expr> childLeft;
-  shared_ptr<Expr> childRight;
+  Expr *childLeft;
+  Expr *childRight;
   BinaryOpKind kind;
 
 public:
   BinaryOp() = delete;
-  BinaryOp(shared_ptr<Expr> left, shared_ptr<Expr> right, BinaryOpKind kind)
+  BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
       : Expr(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
   BinaryOpKind getKind() { return kind; };
   void inferProperties();
-  shared_ptr<Expr> getLeftChild() { return childLeft; };
-  shared_ptr<Expr> getRightChild() { return childRight; };
+  Expr *getLeftChild() const { return childLeft; };
+  Expr *getRightChild() const { return childRight; };
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare();
@@ -100,7 +100,7 @@ public:
     return expr->getKind() == ExprKind::BINARY;
   };
 };
-
+/*
 /// N-ary operation (i.e., MUL)
 class NaryOp : public Expr {
 public:
@@ -126,22 +126,22 @@ public:
     return expr->getKind() == ExprKind::NARY;
   };
 };
-
+*/
 /// Unary operation like transpose or inverse.
 class UnaryOp : public Expr {
 public:
   enum class UnaryOpKind { TRANSPOSE, INVERSE };
 
 private:
-  shared_ptr<Expr> child;
+  Expr *child;
   UnaryOpKind kind;
 
 public:
   UnaryOp() = delete;
-  UnaryOp(shared_ptr<Expr> child, UnaryOpKind kind)
+  UnaryOp(Expr *child, UnaryOpKind kind)
       : Expr(ExprKind::UNARY), child(child), kind(kind){};
   void inferProperties();
-  shared_ptr<Expr> getChild() { return child; };
+  Expr *getChild() const { return child; };
   UnaryOpKind getKind() { return kind; };
   bool isSquare();
   bool isSymmetric();
@@ -154,7 +154,7 @@ public:
   };
 };
 
-shared_ptr<Expr> binaryMul(shared_ptr<Expr> left, shared_ptr<Expr> right);
+Expr *binaryMul(Expr *left, Expr *right);
 
 } // end namespace details.
 
@@ -209,15 +209,14 @@ vector<typename std::common_type<Args...>::type> varargToVector(Args... args) {
 } // end namespace
 
 // Exposed methods.
-void walk(shared_ptr<Expr> node, int level = 0);
-shared_ptr<Expr> inv(shared_ptr<Expr> child);
-shared_ptr<Expr> trans(shared_ptr<Expr> child);
-long getMCPFlops(shared_ptr<Expr> &expr);
+void walk(Expr *node, int level = 0);
+Expr *inv(Expr *child);
+Expr *trans(Expr *child);
+long getMCPFlops(Expr *expr);
 
 // Exposed method: Variadic Mul.
-template <typename Arg, typename... Args>
-shared_ptr<Expr> mul(Arg arg, Args... args) {
-  auto operands = varargToVector<shared_ptr<Expr>>(arg, args...);
+template <typename Arg, typename... Args> Expr *mul(Arg arg, Args... args) {
+  auto operands = varargToVector<Expr *>(arg, args...);
   assert(operands.size() >= 1 && "one or more mul");
   if (operands.size() == 1)
     return operands[0];
@@ -228,7 +227,7 @@ shared_ptr<Expr> mul(Arg arg, Args... args) {
 }
 
 // Exposed for debug only.
-void getKernelCostTopLevelExpr(shared_ptr<Expr> node, long &cost);
-void getKernelCostFullExpr(shared_ptr<Expr> node, long &cost);
+void getKernelCostTopLevelExpr(Expr *node, long &cost);
+void getKernelCostFullExpr(Expr *node, long &cost);
 
 #endif
