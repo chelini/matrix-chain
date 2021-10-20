@@ -27,7 +27,7 @@ SOFTWARE.
 #include <memory>
 #include <vector>
 
-namespace matrixchain {
+namespace details {
 
 using namespace std;
 
@@ -154,6 +154,14 @@ public:
   };
 };
 
+shared_ptr<Expr> binaryMul(shared_ptr<Expr> left, shared_ptr<Expr> right);
+
+} // end namespace details.
+
+namespace matrixchain {
+
+using namespace details;
+
 /// Generic operand (i.e., matrix or vector).
 class Operand : public Expr {
 private:
@@ -205,10 +213,6 @@ void walk(shared_ptr<Expr> node, int level = 0);
 shared_ptr<Expr> inv(shared_ptr<Expr> child);
 shared_ptr<Expr> trans(shared_ptr<Expr> child);
 long getMCPFlops(shared_ptr<Expr> &expr);
-
-namespace details {
-shared_ptr<Expr> binaryMul(shared_ptr<Expr> left, shared_ptr<Expr> right);
-}
 
 // Exposed method: Variadic Mul.
 template <typename Arg, typename... Args>

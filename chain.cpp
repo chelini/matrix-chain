@@ -27,6 +27,7 @@ SOFTWARE.
 #include <limits>
 
 using namespace matrixchain;
+using namespace details;
 
 void UnaryOp::inferProperties() { return; }
 
