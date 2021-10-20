@@ -33,6 +33,34 @@ void UnaryOp::inferProperties() { return; }
 
 void BinaryOp::inferProperties() { return; }
 
+ScopedContext *&ScopedContext::getCurrentScopedContext() {
+  thread_local ScopedContext *context = nullptr;
+  return context;
+}
+
+ScopedContext::~ScopedContext() {
+  for (auto expr : liveRefs)
+    delete expr;
+}
+
+void ScopedContext::print() {
+  cout << "#live refs: " << liveRefs.size() << "\n";
+  int operands = 0;
+  int unaries = 0;
+  int binaries = 0;
+  for (Expr *expr : liveRefs) {
+    if (llvm::isa<Operand>(expr))
+      operands++;
+    if (llvm::isa<UnaryOp>(expr))
+      unaries++;
+    if (llvm::isa<BinaryOp>(expr))
+      binaries++;
+  }
+  cout << "#operands : " << operands << "\n";
+  cout << "#unaries : " << unaries << "\n";
+  cout << "#binaries : " << binaries << "\n";
+}
+
 /// print an array of expression properties.
 static void printProperties(vector<Expr::ExprProperty> properties) {
   for (size_t i = 0, e = properties.size(); i < e; i++) {
@@ -75,9 +103,9 @@ static void printShape(vector<int> shape) {
 #define LEVEL_SPACES 2
 
 /// Walk a generic expression.
-void walk(shared_ptr<Expr> node, int level) {
+void walk(Expr *node, int level) {
   if (node) {
-    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
       switch (binaryOp->getKind()) {
       case BinaryOp::BinaryOpKind::MUL:
         cout << string(level, ' ') << "(*\n";
@@ -89,7 +117,7 @@ void walk(shared_ptr<Expr> node, int level) {
       cout << " \n";
       walk(binaryOp->getRightChild(), level + LEVEL_SPACES);
     } // binaryOp
-    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node)) {
       switch (unaryOp->getKind()) {
       case UnaryOp::UnaryOpKind::TRANSPOSE:
         cout << string(level, ' ') << "transpose(";
@@ -103,12 +131,12 @@ void walk(shared_ptr<Expr> node, int level) {
       walk(unaryOp->getChild());
       cout << ")";
     } // unaryOp
-    if (auto naryOp = llvm::dyn_cast_or_null<NaryOp>(node.get())) {
-      for (auto child : naryOp->getChildren()) {
-        walk(child, level + LEVEL_SPACES);
-      }
-    }
-    if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
+    // if (auto naryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
+    //  for (auto child : naryOp->getChildren()) {
+    //    walk(child, level + LEVEL_SPACES);
+    //  }
+    //}
+    if (auto operand = llvm::dyn_cast_or_null<Operand>(node)) {
       cout << string(level, ' ') << operand->getName() << " [";
       printProperties(operand->getProperties());
       cout << "] [";
@@ -119,34 +147,32 @@ void walk(shared_ptr<Expr> node, int level) {
 }
 
 /// Multiply two expressions.
-shared_ptr<Expr> details::binaryMul(shared_ptr<Expr> left,
-                                    shared_ptr<Expr> right) {
+Expr *details::binaryMul(Expr *left, Expr *right) {
   assert(left && "left expr must be non null");
   assert(right && "right expr must be non null");
-  return shared_ptr<Expr>(
-      new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL));
+  return new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL);
 }
 
 /// invert an expression.
-shared_ptr<Expr> inv(shared_ptr<Expr> child) {
+Expr *inv(Expr *child) {
   assert(child && "child expr must be non null");
-  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::INVERSE));
+  return new UnaryOp(child, UnaryOp::UnaryOpKind::INVERSE);
 }
 
 /// transpose an expression.
-shared_ptr<Expr> trans(shared_ptr<Expr> child) {
+Expr *trans(Expr *child) {
   assert(child && "child expr must be non null");
-  return shared_ptr<Expr>(new UnaryOp(child, UnaryOp::UnaryOpKind::TRANSPOSE));
+  return new UnaryOp(child, UnaryOp::UnaryOpKind::TRANSPOSE);
 }
 
-static vector<long> getPVector(vector<shared_ptr<Expr>> exprs) {
+static vector<long> getPVector(vector<Expr *> exprs) {
   vector<long> pVector;
   for (auto expr : exprs) {
     Operand *operand = nullptr;
-    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(expr.get()))
-      operand = llvm::dyn_cast_or_null<Operand>(unaryOp->getChild().get());
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(expr))
+      operand = llvm::dyn_cast_or_null<Operand>(unaryOp->getChild());
     else
-      operand = llvm::dyn_cast_or_null<Operand>(expr.get());
+      operand = llvm::dyn_cast_or_null<Operand>(expr);
     assert(operand && "must be non null");
     auto shape = operand->getShape();
     if (!pVector.size()) {
@@ -160,16 +186,16 @@ static vector<long> getPVector(vector<shared_ptr<Expr>> exprs) {
 }
 
 static void printOptimalParens(const vector<vector<long>> &s, size_t i,
-                               size_t j, vector<shared_ptr<Expr>> operands) {
+                               size_t j, vector<Expr *> operands) {
   if (i == j) {
     cout << " ";
     Operand *operand = nullptr;
-    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(operands[i - 1].get()))
-      operand = llvm::dyn_cast_or_null<Operand>(unaryOp->getChild().get());
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(operands[i - 1]))
+      operand = llvm::dyn_cast_or_null<Operand>(unaryOp->getChild());
     else
-      operand = llvm::dyn_cast_or_null<Operand>(operands[i - 1].get());
+      operand = llvm::dyn_cast_or_null<Operand>(operands[i - 1]);
     assert(operand && "must be non null");
-    if (llvm::isa<UnaryOp>(operands[i - 1].get()))
+    if (llvm::isa<UnaryOp>(operands[i - 1]))
       cout << "u(" << operand->getName() << ")";
     else
       cout << operand->getName();
@@ -182,29 +208,27 @@ static void printOptimalParens(const vector<vector<long>> &s, size_t i,
   }
 }
 
-static void collectOperandsImpl(shared_ptr<Expr> node,
-                                vector<shared_ptr<Expr>> &operands) {
+static void collectOperandsImpl(Expr *node, vector<Expr *> &operands) {
   if (node) {
-    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
       collectOperandsImpl(binaryOp->getLeftChild(), operands);
       collectOperandsImpl(binaryOp->getRightChild(), operands);
     }
-    if (llvm::isa<UnaryOp>(node.get()) || llvm::isa<Operand>(node.get())) {
-      assert(node.get() != nullptr && "must be non-null");
+    if (llvm::isa<UnaryOp>(node) || llvm::isa<Operand>(node)) {
+      assert(node != nullptr && "must be non-null");
       operands.push_back(node);
     }
   }
 }
 
-static vector<shared_ptr<Expr>> collectOperands(shared_ptr<Expr> &expr) {
-  vector<shared_ptr<Expr>> operands;
+static vector<Expr *> collectOperands(Expr *expr) {
+  vector<Expr *> operands;
   collectOperandsImpl(expr, operands);
   return operands;
 }
 
 #if DEBUG
-static void print(vector<vector<shared_ptr<Expr>>> &tmps,
-                  bool bitLayout = false) {
+static void print(vector<vector<Expr *>> &tmps, bool bitLayout = false) {
   int rows = tmps.size();
   int cols = tmps[0].size();
 
@@ -226,10 +250,9 @@ static void print(vector<vector<shared_ptr<Expr>>> &tmps,
 #endif
 
 // TODO: n-ary how to handle? Do we need to?
-pair<long, long> getKernelCostImpl(shared_ptr<Expr> node, long &cost,
-                                   bool fullTree) {
+pair<long, long> getKernelCostImpl(Expr *node, long &cost, bool fullTree) {
   if (node) {
-    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node.get())) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
       pair<long, long> left =
           getKernelCostImpl(binaryOp->getLeftChild(), cost, fullTree);
       pair<long, long> right =
@@ -252,10 +275,10 @@ pair<long, long> getKernelCostImpl(shared_ptr<Expr> node, long &cost,
 
       return {left.first, right.second};
     }
-    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node.get())) {
+    if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node)) {
       return getKernelCostImpl(unaryOp->getChild(), cost, fullTree);
     }
-    if (auto operand = llvm::dyn_cast_or_null<Operand>(node.get())) {
+    if (auto operand = llvm::dyn_cast_or_null<Operand>(node)) {
       auto shape = operand->getShape();
       assert(shape.size() == 2 && "must be 2d");
       return {shape[0], shape[1]};
@@ -264,11 +287,11 @@ pair<long, long> getKernelCostImpl(shared_ptr<Expr> node, long &cost,
   return {0, 0};
 }
 
-void getKernelCostFullExpr(shared_ptr<Expr> node, long &cost) {
+void getKernelCostFullExpr(Expr *node, long &cost) {
   (void)getKernelCostImpl(node, cost, true);
 }
 
-void getKernelCostTopLevelExpr(shared_ptr<Expr> node, long &cost) {
+void getKernelCostTopLevelExpr(Expr *node, long &cost) {
   (void)getKernelCostImpl(node, cost, false);
 }
 
@@ -277,21 +300,20 @@ struct ResultMCP {
   vector<vector<long>> s;
 };
 
-ResultMCP runMCP(shared_ptr<Expr> &expr) {
+ResultMCP runMCP(Expr *expr) {
 #if DEBUG
   cout << "Starting point\n";
   walk(expr);
   cout << "\n\n";
 #endif
-  vector<shared_ptr<Expr>> operands = collectOperands(expr);
+  vector<Expr *> operands = collectOperands(expr);
   vector<long> pVector = getPVector(operands);
   const size_t n = pVector.size();
   vector<vector<long>> m(n, vector<long>(n, std::numeric_limits<long>::max()));
   vector<vector<long>> s(n, vector<long>(n, std::numeric_limits<long>::max()));
 
   // store symbolic temporary variables representing sub-chains.
-  vector<vector<shared_ptr<Expr>>> tmps(n,
-                                        vector<shared_ptr<Expr>>(n, nullptr));
+  vector<vector<Expr *>> tmps(n, vector<Expr *>(n, nullptr));
 
   for (size_t i = 0; i < n - 1; i++)
     tmps[i + 1][i + 1] = operands.at(i);
@@ -369,7 +391,7 @@ ResultMCP runMCP(shared_ptr<Expr> &expr) {
   return {m, s};
 }
 
-long getMCPFlops(shared_ptr<Expr> &expr) {
+long getMCPFlops(Expr *expr) {
   ResultMCP result = runMCP(expr);
   auto m = result.m;
 #if DEBUG

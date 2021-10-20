@@ -25,11 +25,31 @@ SOFTWARE.
 
 #include <cassert>
 #include <memory>
+#include <set>
 #include <vector>
 
 namespace details {
 
 using namespace std;
+
+// forward decl.
+class Expr;
+
+/// Scoped context to handle deallocation.
+class ScopedContext {
+public:
+  ScopedContext() { ScopedContext::getCurrentScopedContext() = this; };
+  ~ScopedContext();
+  ScopedContext(const ScopedContext &) = delete;
+  ScopedContext &operator=(const ScopedContext &) = delete;
+
+  void insert(Expr *expr) { liveRefs.insert(expr); }
+  void print();
+  static ScopedContext *&getCurrentScopedContext();
+
+private:
+  std::set<Expr *> liveRefs;
+};
 
 /// Generic expr of type BINARY, UNARY or OPERAND.
 class Expr {
@@ -55,6 +75,8 @@ public:
   virtual void setProperties(vector<Expr::ExprProperty> properties) {
     assert(0 && "can set properties only for operands");
   };
+  // TODO: check me.
+  virtual ~Expr() = default;
   virtual void inferProperties() = 0;
 
   virtual bool isUpperTriangular() = 0;
@@ -64,32 +86,45 @@ public:
   virtual bool isFullRank() = 0;
   virtual bool isSPD() = 0;
 
-  bool isTransposeOf(shared_ptr<Expr> right);
+  bool isTransposeOf(Expr *right);
 
 protected:
   Expr() = delete;
   Expr(ExprKind kind) : kind(kind), inferredProperties({}){};
 };
 
+/// CRTP to inject
+template <class T> struct AutoRef : public Expr {
+
+private:
+  friend T;
+
+  AutoRef(Expr::ExprKind kind) : Expr(kind) {
+    auto ctx = ScopedContext::getCurrentScopedContext();
+    assert(ctx != nullptr && "ctx not available");
+    ctx->insert(static_cast<T *>(this));
+  }
+};
+
 /// Binary operation (i.e., MUL).
-class BinaryOp : public Expr {
+class BinaryOp : public AutoRef<BinaryOp> {
 public:
   enum class BinaryOpKind { MUL };
 
 private:
-  shared_ptr<Expr> childLeft;
-  shared_ptr<Expr> childRight;
+  Expr *childLeft;
+  Expr *childRight;
   BinaryOpKind kind;
 
 public:
   BinaryOp() = delete;
-  BinaryOp(shared_ptr<Expr> left, shared_ptr<Expr> right, BinaryOpKind kind)
-      : Expr(ExprKind::BINARY), childLeft(left), childRight(right),
+  BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
+      : AutoRef(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
   BinaryOpKind getKind() { return kind; };
   void inferProperties();
-  shared_ptr<Expr> getLeftChild() { return childLeft; };
-  shared_ptr<Expr> getRightChild() { return childRight; };
+  Expr *getLeftChild() const { return childLeft; };
+  Expr *getRightChild() const { return childRight; };
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare();
@@ -100,7 +135,7 @@ public:
     return expr->getKind() == ExprKind::BINARY;
   };
 };
-
+/*
 /// N-ary operation (i.e., MUL)
 class NaryOp : public Expr {
 public:
@@ -126,22 +161,22 @@ public:
     return expr->getKind() == ExprKind::NARY;
   };
 };
-
+*/
 /// Unary operation like transpose or inverse.
-class UnaryOp : public Expr {
+class UnaryOp : public AutoRef<UnaryOp> {
 public:
   enum class UnaryOpKind { TRANSPOSE, INVERSE };
 
 private:
-  shared_ptr<Expr> child;
+  Expr *child;
   UnaryOpKind kind;
 
 public:
   UnaryOp() = delete;
-  UnaryOp(shared_ptr<Expr> child, UnaryOpKind kind)
-      : Expr(ExprKind::UNARY), child(child), kind(kind){};
+  UnaryOp(Expr *child, UnaryOpKind kind)
+      : AutoRef(ExprKind::UNARY), child(child), kind(kind){};
   void inferProperties();
-  shared_ptr<Expr> getChild() { return child; };
+  Expr *getChild() const { return child; };
   UnaryOpKind getKind() { return kind; };
   bool isSquare();
   bool isSymmetric();
@@ -154,7 +189,7 @@ public:
   };
 };
 
-shared_ptr<Expr> binaryMul(shared_ptr<Expr> left, shared_ptr<Expr> right);
+Expr *binaryMul(Expr *left, Expr *right);
 
 } // end namespace details.
 
@@ -163,7 +198,7 @@ namespace matrixchain {
 using namespace details;
 
 /// Generic operand (i.e., matrix or vector).
-class Operand : public Expr {
+class Operand : public AutoRef<Operand> {
 private:
   string name;
   vector<int> shape;
@@ -171,7 +206,7 @@ private:
 public:
   Operand() = delete;
   Operand(string name, vector<int> shape)
-      : Expr(ExprKind::OPERAND), name(name), shape(shape){};
+      : AutoRef(ExprKind::OPERAND), name(name), shape(shape){};
   string getName() { return name; };
   vector<int> getShape() { return shape; };
   vector<Expr::ExprProperty> getProperties() { return inferredProperties; };
@@ -209,15 +244,14 @@ vector<typename std::common_type<Args...>::type> varargToVector(Args... args) {
 } // end namespace
 
 // Exposed methods.
-void walk(shared_ptr<Expr> node, int level = 0);
-shared_ptr<Expr> inv(shared_ptr<Expr> child);
-shared_ptr<Expr> trans(shared_ptr<Expr> child);
-long getMCPFlops(shared_ptr<Expr> &expr);
+void walk(Expr *node, int level = 0);
+Expr *inv(Expr *child);
+Expr *trans(Expr *child);
+long getMCPFlops(Expr *expr);
 
 // Exposed method: Variadic Mul.
-template <typename Arg, typename... Args>
-shared_ptr<Expr> mul(Arg arg, Args... args) {
-  auto operands = varargToVector<shared_ptr<Expr>>(arg, args...);
+template <typename Arg, typename... Args> Expr *mul(Arg arg, Args... args) {
+  auto operands = varargToVector<Expr *>(arg, args...);
   assert(operands.size() >= 1 && "one or more mul");
   if (operands.size() == 1)
     return operands[0];
@@ -228,7 +262,7 @@ shared_ptr<Expr> mul(Arg arg, Args... args) {
 }
 
 // Exposed for debug only.
-void getKernelCostTopLevelExpr(shared_ptr<Expr> node, long &cost);
-void getKernelCostFullExpr(shared_ptr<Expr> node, long &cost);
+void getKernelCostTopLevelExpr(Expr *node, long &cost);
+void getKernelCostFullExpr(Expr *node, long &cost);
 
 #endif
