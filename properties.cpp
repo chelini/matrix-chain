@@ -115,7 +115,8 @@ bool BinaryOp::isUpperTriangular() {
   auto kind = this->getKind();
   switch (kind) {
   case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isUpperTriangular() && childRight->isUpperTriangular();
+    // TODO: all_of at this point.
+    return children[0]->isUpperTriangular() && children[1]->isUpperTriangular();
   default:
     assert(0 && "UNK");
   }
@@ -126,7 +127,8 @@ bool BinaryOp::isLowerTriangular() {
   auto kind = this->getKind();
   switch (kind) {
   case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isLowerTriangular() && childRight->isLowerTriangular();
+    // TODO: all_of at this point.
+    return children[0]->isLowerTriangular() && children[1]->isLowerTriangular();
   default:
     assert(0 && "UNK");
   }
@@ -135,7 +137,7 @@ bool BinaryOp::isLowerTriangular() {
 
 bool BinaryOp::isSquare() { assert(0 && "no impl"); }
 
-bool BinaryOp::isSymmetric() { return childLeft->isTransposeOf(childRight); }
+bool BinaryOp::isSymmetric() { return children[0]->isTransposeOf(children[1]); }
 
 bool BinaryOp::isFullRank() {
   // assert(0 && "no impl");
@@ -149,7 +151,7 @@ bool BinaryOp::isSPD() {
   auto kind = this->getKind();
   switch (kind) {
   case BinaryOp::BinaryOpKind::MUL:
-    return childLeft->isFullRank() && this->isSymmetric();
+    return children[0]->isFullRank() && this->isSymmetric();
   default:
     assert(0 && "UNK");
   }

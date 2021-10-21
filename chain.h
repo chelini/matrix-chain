@@ -80,6 +80,7 @@ public:
 
   virtual ~Expr() = default;
   virtual void inferProperties() = 0;
+  virtual Expr *getNormalForm() = 0;
 
   virtual bool isUpperTriangular() = 0;
   virtual bool isLowerTriangular() = 0;
@@ -116,20 +117,18 @@ public:
   enum class BinaryOpKind { MUL };
 
 private:
-  Expr *childLeft;
-  Expr *childRight;
+  vector<Expr *> children;
   BinaryOpKind kind;
 
 public:
   BinaryOp() = delete;
-  BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
-      : ScopedExpr(ExprKind::BINARY), childLeft(left), childRight(right),
-        kind(kind){};
+  BinaryOp(vector<Expr *> children, BinaryOpKind kind)
+      : ScopedExpr(ExprKind::BINARY), children(children), kind(kind){};
   BinaryOpKind getKind() const { return kind; };
   void inferProperties();
+  Expr *getNormalForm();
 
-  Expr *getLeftChild() const { return childLeft; };
-  Expr *getRightChild() const { return childRight; };
+  vector<Expr *> getChildren() const { return children; }
 
   bool isUpperTriangular();
   bool isLowerTriangular();
@@ -157,9 +156,9 @@ public:
   UnaryOp(Expr *child, UnaryOpKind kind)
       : ScopedExpr(ExprKind::UNARY), child(child), kind(kind){};
   void inferProperties();
+  Expr *getNormalForm();
 
   Expr *getChild() const { return child; };
-
   UnaryOpKind getKind() const { return kind; };
 
   bool isSquare();
@@ -174,7 +173,7 @@ public:
   };
 };
 
-Expr *binaryMul(Expr *left, Expr *right);
+Expr *binaryMul(vector<Expr *> children);
 
 } // end namespace details.
 
@@ -200,6 +199,7 @@ public:
   void setProperties(vector<Expr::ExprProperty> properties) {
     inferredProperties = properties;
   };
+  Expr *getNormalForm();
   void inferProperties(){};
   bool isUpperTriangular();
   bool isLowerTriangular();
@@ -240,13 +240,8 @@ long getMCPFlops(Expr *expr);
 // Exposed method: Variadic Mul.
 template <typename Arg, typename... Args> Expr *mul(Arg arg, Args... args) {
   auto operands = varargToVector<Expr *>(arg, args...);
-  assert(operands.size() >= 1 && "one or more mul");
-  if (operands.size() == 1)
-    return operands[0];
-  auto result = operands[0];
-  for (size_t i = 1; i < operands.size(); i++)
-    result = details::binaryMul(result, operands[i]);
-  return result;
+  assert(operands.size() >= 2 && "one or more mul");
+  return details::binaryMul(operands);
 }
 
 // Exposed for debug only.

@@ -178,11 +178,16 @@ TEST(Chain, areSameTree) {
   is = exp1->isSame(exp3);
   EXPECT_EQ(is, false);
 }
-
-TEST(Chain, collapseMuls) {
+/*
+TEST(Chain, NormalForm) {
   ScopedContext ctx;
   auto *A = new Operand("A", {20, 20});
-  auto *exp1 = trans(mul(A, mul(A, mul(A, mul(A, A)))));
-  auto *result = collapseMuls(exp1);
-  walk(result);
+  auto *B = new Operand("B", {20, 20});
+  auto *C = new Operand("C", {20, 20});
+  auto *expr = trans(mul(A, mul(B, C)));
+  walk(expr);
+  cout << "\n\n normal form --->\n\n";
+  auto *normalForm = expr->getNormalForm();
+  walk(normalForm);
 }
+*/

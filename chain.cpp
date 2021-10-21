@@ -113,9 +113,10 @@ void walk(const Expr *node, int level) {
       default:
         cout << "UNK";
       }
-      walk(binaryOp->getLeftChild(), level + LEVEL_SPACES);
-      cout << " \n";
-      walk(binaryOp->getRightChild(), level + LEVEL_SPACES);
+      for (auto child : binaryOp->getChildren()) {
+        walk(child, level + LEVEL_SPACES);
+        cout << " \n";
+      }
     } // binaryOp
     if (auto unaryOp = llvm::dyn_cast_or_null<UnaryOp>(node)) {
       switch (unaryOp->getKind()) {
@@ -142,10 +143,8 @@ void walk(const Expr *node, int level) {
 }
 
 /// Multiply two expressions.
-Expr *details::binaryMul(Expr *left, Expr *right) {
-  assert(left && "left expr must be non null");
-  assert(right && "right expr must be non null");
-  return new BinaryOp(left, right, BinaryOp::BinaryOpKind::MUL);
+Expr *details::binaryMul(vector<Expr *> children) {
+  return new BinaryOp(children, BinaryOp::BinaryOpKind::MUL);
 }
 
 /// invert an expression.
@@ -206,8 +205,9 @@ static void printOptimalParens(const vector<vector<long>> &s, size_t i,
 static void collectOperandsImpl(Expr *node, vector<Expr *> &operands) {
   if (node) {
     if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
-      collectOperandsImpl(binaryOp->getLeftChild(), operands);
-      collectOperandsImpl(binaryOp->getRightChild(), operands);
+      for (auto child : binaryOp->getChildren()) {
+        collectOperandsImpl(child, operands);
+      }
     }
     if (llvm::isa<UnaryOp>(node) || llvm::isa<Operand>(node)) {
       assert(node != nullptr && "must be non-null");
@@ -248,19 +248,19 @@ static void print(vector<vector<Expr *>> &tmps, bool bitLayout = false) {
 pair<long, long> getKernelCostImpl(Expr *node, long &cost, bool fullTree) {
   if (node) {
     if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
-      pair<long, long> left =
-          getKernelCostImpl(binaryOp->getLeftChild(), cost, fullTree);
-      pair<long, long> right =
-          getKernelCostImpl(binaryOp->getRightChild(), cost, fullTree);
+      auto children = binaryOp->getChildren();
+      assert(children.size() == 2);
+      pair<long, long> left = getKernelCostImpl(children[0], cost, fullTree);
+      pair<long, long> right = getKernelCostImpl(children[1], cost, fullTree);
       // note this cost must be the cost of the top level expr
       // not the cost of the tree.
       // GEMM by default adjust later on.
       auto currentCost = left.first * left.second * right.second * 2;
       // TRMM TODO: must be square the other?
-      if (binaryOp->getLeftChild()->isLowerTriangular())
+      if (children[0]->isLowerTriangular())
         currentCost >>= 1;
       // SYMM TODO: must be square the other?
-      else if (binaryOp->getLeftChild()->isSymmetric())
+      else if (children[0]->isSymmetric())
         currentCost >>= 1;
 
       if (fullTree)
