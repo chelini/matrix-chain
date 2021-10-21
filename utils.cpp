@@ -58,9 +58,9 @@ static bool isSameImpl(const Expr *tree1, const Expr *tree2) {
       return isSameImpl(tree1Op->getChild(), tree2Op->getChild());
     }
     // binary.
-    if (llvm::isa<BinaryOp>(tree1) && llvm::isa<BinaryOp>(tree2)) {
-      const BinaryOp *tree1Op = llvm::dyn_cast_or_null<BinaryOp>(tree1);
-      const BinaryOp *tree2Op = llvm::dyn_cast_or_null<BinaryOp>(tree2);
+    if (llvm::isa<NaryOp>(tree1) && llvm::isa<NaryOp>(tree2)) {
+      const NaryOp *tree1Op = llvm::dyn_cast_or_null<NaryOp>(tree1);
+      const NaryOp *tree2Op = llvm::dyn_cast_or_null<NaryOp>(tree2);
       return isSameImpl(tree1Op->getChildren()[0], tree2Op->getChildren()[0]) &&
              isSameImpl(tree1Op->getChildren()[1], tree2Op->getChildren()[1]);
     }
@@ -70,14 +70,14 @@ static bool isSameImpl(const Expr *tree1, const Expr *tree2) {
 
 Expr *Operand::getNormalForm() { return this; }
 
-Expr *BinaryOp::getNormalForm() {
+Expr *NaryOp::getNormalForm() {
   // assert(0);
   return nullptr;
 }
 
 Expr *UnaryOp::getNormalForm() {
   Expr *child = this->getChild();
-  if (BinaryOp *maybeMul = llvm::dyn_cast_or_null<BinaryOp>(child)) {
+  if (NaryOp *maybeMul = llvm::dyn_cast_or_null<NaryOp>(child)) {
     Expr *leftChild = maybeMul->getChildren()[0]->getNormalForm();
     Expr *rightChild = maybeMul->getChildren()[1]->getNormalForm();
     return mul(trans(leftChild), trans(rightChild));

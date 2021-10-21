@@ -31,7 +31,7 @@ using namespace details;
 
 void UnaryOp::inferProperties() { return; }
 
-void BinaryOp::inferProperties() { return; }
+void NaryOp::inferProperties() { return; }
 
 ScopedContext *&ScopedContext::getCurrentScopedContext() {
   thread_local ScopedContext *context = nullptr;
@@ -53,7 +53,7 @@ void ScopedContext::print() {
       operands++;
     if (llvm::isa<UnaryOp>(expr))
       unaries++;
-    if (llvm::isa<BinaryOp>(expr))
+    if (llvm::isa<NaryOp>(expr))
       binaries++;
   }
   cout << "#operands : " << operands << "\n";
@@ -105,9 +105,9 @@ static void printShape(vector<int> shape) {
 /// Walk a generic expression.
 void walk(const Expr *node, int level) {
   if (node) {
-    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
       switch (binaryOp->getKind()) {
-      case BinaryOp::BinaryOpKind::MUL:
+      case NaryOp::NaryOpKind::MUL:
         cout << string(level, ' ') << "(*\n";
         break;
       default:
@@ -144,7 +144,7 @@ void walk(const Expr *node, int level) {
 
 /// Multiply two expressions.
 Expr *details::binaryMul(vector<Expr *> children) {
-  return new BinaryOp(children, BinaryOp::BinaryOpKind::MUL);
+  return new NaryOp(children, NaryOp::NaryOpKind::MUL);
 }
 
 /// invert an expression.
@@ -204,7 +204,7 @@ static void printOptimalParens(const vector<vector<long>> &s, size_t i,
 
 static void collectOperandsImpl(Expr *node, vector<Expr *> &operands) {
   if (node) {
-    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
       for (auto child : binaryOp->getChildren()) {
         collectOperandsImpl(child, operands);
       }
@@ -247,7 +247,7 @@ static void print(vector<vector<Expr *>> &tmps, bool bitLayout = false) {
 // TODO: n-ary how to handle? Do we need to?
 pair<long, long> getKernelCostImpl(Expr *node, long &cost, bool fullTree) {
   if (node) {
-    if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
+    if (auto binaryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
       auto children = binaryOp->getChildren();
       assert(children.size() == 2);
       pair<long, long> left = getKernelCostImpl(children[0], cost, fullTree);

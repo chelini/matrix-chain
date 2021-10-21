@@ -111,10 +111,10 @@ bool UnaryOp::isSPD() {
 
 // ----------------------------------------------------------------------
 
-bool BinaryOp::isUpperTriangular() {
+bool NaryOp::isUpperTriangular() {
   auto kind = this->getKind();
   switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
+  case NaryOp::NaryOpKind::MUL:
     // TODO: all_of at this point.
     return children[0]->isUpperTriangular() && children[1]->isUpperTriangular();
   default:
@@ -123,10 +123,10 @@ bool BinaryOp::isUpperTriangular() {
   return false;
 }
 
-bool BinaryOp::isLowerTriangular() {
+bool NaryOp::isLowerTriangular() {
   auto kind = this->getKind();
   switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
+  case NaryOp::NaryOpKind::MUL:
     // TODO: all_of at this point.
     return children[0]->isLowerTriangular() && children[1]->isLowerTriangular();
   default:
@@ -135,11 +135,11 @@ bool BinaryOp::isLowerTriangular() {
   return false;
 }
 
-bool BinaryOp::isSquare() { assert(0 && "no impl"); }
+bool NaryOp::isSquare() { assert(0 && "no impl"); }
 
-bool BinaryOp::isSymmetric() { return children[0]->isTransposeOf(children[1]); }
+bool NaryOp::isSymmetric() { return children[0]->isTransposeOf(children[1]); }
 
-bool BinaryOp::isFullRank() {
+bool NaryOp::isFullRank() {
   // assert(0 && "no impl");
   return false;
 }
@@ -147,10 +147,10 @@ bool BinaryOp::isFullRank() {
 // see:
 // https://github.com/HPAC/linnea/blob/c8fb5d1f64666bf63d35859484a5041ff75dbb90/linnea/algebra/property_inference.py#L109
 // TODO: miss check left.columns >= left.rows
-bool BinaryOp::isSPD() {
+bool NaryOp::isSPD() {
   auto kind = this->getKind();
   switch (kind) {
-  case BinaryOp::BinaryOpKind::MUL:
+  case NaryOp::NaryOpKind::MUL:
     return children[0]->isFullRank() && this->isSymmetric();
   default:
     assert(0 && "UNK");

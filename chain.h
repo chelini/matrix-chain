@@ -34,7 +34,7 @@ using namespace std;
 
 // forward decl.
 class Expr;
-class BinaryOp;
+class NaryOp;
 class UnaryOp;
 
 /// Scoped context to handle deallocation.
@@ -111,20 +111,20 @@ public:
   }
 };
 
-/// Binary operation (i.e., MUL).
-class BinaryOp : public ScopedExpr<BinaryOp> {
+/// Nary operation (i.e., MUL).
+class NaryOp : public ScopedExpr<NaryOp> {
 public:
-  enum class BinaryOpKind { MUL };
+  enum class NaryOpKind { MUL };
 
 private:
   vector<Expr *> children;
-  BinaryOpKind kind;
+  NaryOpKind kind;
 
 public:
-  BinaryOp() = delete;
-  BinaryOp(vector<Expr *> children, BinaryOpKind kind)
+  NaryOp() = delete;
+  NaryOp(vector<Expr *> children, NaryOpKind kind)
       : ScopedExpr(ExprKind::BINARY), children(children), kind(kind){};
-  BinaryOpKind getKind() const { return kind; };
+  NaryOpKind getKind() const { return kind; };
   void inferProperties();
   Expr *getNormalForm();
 
