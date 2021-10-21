@@ -79,3 +79,5 @@ bool Expr::isSame(const Expr *right) {
     return true;
   return false;
 }
+
+Expr *collapseMuls(const Expr *tree) { return nullptr; }

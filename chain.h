@@ -34,6 +34,8 @@ using namespace std;
 
 // forward decl.
 class Expr;
+class BinaryOp;
+class UnaryOp;
 
 /// Scoped context to handle deallocation.
 class ScopedContext {
@@ -75,7 +77,7 @@ public:
   virtual void setProperties(vector<Expr::ExprProperty> properties) {
     assert(0 && "can set properties only for operands");
   };
-  // TODO: check me.
+
   virtual ~Expr() = default;
   virtual void inferProperties() = 0;
 
@@ -94,13 +96,14 @@ protected:
   Expr(ExprKind kind) : kind(kind), inferredProperties({}){};
 };
 
-/// CRTP to inject
-template <class T> struct AutoRef : public Expr {
+/// ScopedExpr
+template <class T> class ScopedExpr : public Expr {
 
 private:
   friend T;
 
-  AutoRef(Expr::ExprKind kind) : Expr(kind) {
+public:
+  ScopedExpr(Expr::ExprKind kind) : Expr(kind) {
     auto ctx = ScopedContext::getCurrentScopedContext();
     assert(ctx != nullptr && "ctx not available");
     ctx->insert(static_cast<T *>(this));
@@ -108,7 +111,7 @@ private:
 };
 
 /// Binary operation (i.e., MUL).
-class BinaryOp : public AutoRef<BinaryOp> {
+class BinaryOp : public ScopedExpr<BinaryOp> {
 public:
   enum class BinaryOpKind { MUL };
 
@@ -120,50 +123,28 @@ private:
 public:
   BinaryOp() = delete;
   BinaryOp(Expr *left, Expr *right, BinaryOpKind kind)
-      : AutoRef(ExprKind::BINARY), childLeft(left), childRight(right),
+      : ScopedExpr(ExprKind::BINARY), childLeft(left), childRight(right),
         kind(kind){};
   BinaryOpKind getKind() const { return kind; };
   void inferProperties();
+
   Expr *getLeftChild() const { return childLeft; };
   Expr *getRightChild() const { return childRight; };
+
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isSquare();
   bool isSymmetric();
   bool isFullRank();
   bool isSPD();
+
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
   };
 };
 
-/// N-ary operation (i.e., MUL)
-class NaryOp : public Expr {
-public:
-  enum class NaryOpKind { MUL };
-
-private:
-  vector<Expr *> children;
-  NaryOpKind kind;
-
-public:
-  NaryOp() = delete;
-  NaryOp(vector<Expr *> children) : Expr(ExprKind::NARY), children(children){};
-  NaryOpKind getKind() { return kind; };
-  vector<Expr *> getChildren() { return children; };
-  bool isUpperTriangular();
-  bool isLowerTriangular();
-  bool isSquare() { return false; };
-  bool isSymmetric() { return false; };
-  bool isFullRank() { return false; };
-  bool isSPD() { return false; };
-  static bool classof(const Expr *expr) {
-    return expr->getKind() == ExprKind::NARY;
-  };
-};
-
 /// Unary operation like transpose or inverse.
-class UnaryOp : public AutoRef<UnaryOp> {
+class UnaryOp : public ScopedExpr<UnaryOp> {
 public:
   enum class UnaryOpKind { TRANSPOSE, INVERSE };
 
@@ -174,16 +155,20 @@ private:
 public:
   UnaryOp() = delete;
   UnaryOp(Expr *child, UnaryOpKind kind)
-      : AutoRef(ExprKind::UNARY), child(child), kind(kind){};
+      : ScopedExpr(ExprKind::UNARY), child(child), kind(kind){};
   void inferProperties();
+
   Expr *getChild() const { return child; };
+
   UnaryOpKind getKind() const { return kind; };
+
   bool isSquare();
   bool isSymmetric();
   bool isUpperTriangular();
   bool isLowerTriangular();
   bool isFullRank();
   bool isSPD();
+
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
   };
@@ -198,7 +183,7 @@ namespace matrixchain {
 using namespace details;
 
 /// Generic operand (i.e., matrix or vector).
-class Operand : public AutoRef<Operand> {
+class Operand : public ScopedExpr<Operand> {
 private:
   string name;
   vector<int> shape;
@@ -206,10 +191,12 @@ private:
 public:
   Operand() = delete;
   Operand(string name, vector<int> shape)
-      : AutoRef(ExprKind::OPERAND), name(name), shape(shape){};
-  string getName() { return name; };
-  vector<int> getShape() { return shape; };
-  vector<Expr::ExprProperty> getProperties() { return inferredProperties; };
+      : ScopedExpr(ExprKind::OPERAND), name(name), shape(shape){};
+  string getName() const { return name; };
+  vector<int> getShape() const { return shape; };
+  vector<Expr::ExprProperty> getProperties() const {
+    return inferredProperties;
+  };
   void setProperties(vector<Expr::ExprProperty> properties) {
     inferredProperties = properties;
   };
@@ -244,7 +231,8 @@ vector<typename std::common_type<Args...>::type> varargToVector(Args... args) {
 } // end namespace
 
 // Exposed methods.
-void walk(Expr *node, int level = 0);
+void walk(const Expr *node, int level = 0);
+Expr *collapseMuls(const Expr *tree);
 Expr *inv(Expr *child);
 Expr *trans(Expr *child);
 long getMCPFlops(Expr *expr);

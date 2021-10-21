@@ -103,7 +103,7 @@ static void printShape(vector<int> shape) {
 #define LEVEL_SPACES 2
 
 /// Walk a generic expression.
-void walk(Expr *node, int level) {
+void walk(const Expr *node, int level) {
   if (node) {
     if (auto binaryOp = llvm::dyn_cast_or_null<BinaryOp>(node)) {
       switch (binaryOp->getKind()) {
@@ -131,11 +131,6 @@ void walk(Expr *node, int level) {
       walk(unaryOp->getChild());
       cout << ")";
     } // unaryOp
-    if (auto naryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
-      for (auto child : naryOp->getChildren()) {
-        walk(child, level + LEVEL_SPACES);
-      }
-    }
     if (auto operand = llvm::dyn_cast_or_null<Operand>(node)) {
       cout << string(level, ' ') << operand->getName() << " [";
       printProperties(operand->getProperties());

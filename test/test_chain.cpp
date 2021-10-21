@@ -178,3 +178,11 @@ TEST(Chain, areSameTree) {
   is = exp1->isSame(exp3);
   EXPECT_EQ(is, false);
 }
+
+TEST(Chain, collapseMuls) {
+  ScopedContext ctx;
+  auto *A = new Operand("A", {20, 20});
+  auto *exp1 = trans(mul(A, mul(A, mul(A, mul(A, A)))));
+  auto *result = collapseMuls(exp1);
+  walk(result);
+}
