@@ -23,6 +23,7 @@ SOFTWARE.
 #include "chain.h"
 #include "llvm/Support/Casting.h"
 #include <algorithm>
+#include <array>
 #include <iostream>
 #include <limits>
 
@@ -142,9 +143,24 @@ void walk(const Expr *node, int level) {
   }
 }
 
-/// Multiply two expressions.
-Expr *details::binaryMul(vector<Expr *> children) {
-  return new NaryOp(children, NaryOp::NaryOpKind::MUL);
+/// Multiply two or more expressions.
+Expr *details::binaryMul(vector<Expr *> children, bool binary) {
+  if (binary) {
+    assert(children.size() == 2 && "expect only two children");
+    return new NaryOp({children[0], children[1]}, NaryOp::NaryOpKind::MUL);
+  }
+  // fold other mul inside.
+  vector<Expr *> newChildren;
+  int size = children.size();
+  for (int i = size - 1; i >= 0; i--) {
+    if (auto childMul = llvm::dyn_cast_or_null<NaryOp>(children.at(i))) {
+      auto childrenOfChildMul = childMul->getChildren();
+      newChildren.insert(newChildren.begin(), childrenOfChildMul.begin(),
+                         childrenOfChildMul.end());
+    } else
+      newChildren.insert(newChildren.begin(), children.at(i));
+  }
+  return new NaryOp(newChildren, NaryOp::NaryOpKind::MUL);
 }
 
 /// invert an expression.
@@ -249,6 +265,7 @@ pair<long, long> getKernelCostImpl(Expr *node, long &cost, bool fullTree) {
   if (node) {
     if (auto binaryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
       auto children = binaryOp->getChildren();
+      // walk(node);
       assert(children.size() == 2);
       pair<long, long> left = getKernelCostImpl(children[0], cost, fullTree);
       pair<long, long> right = getKernelCostImpl(children[1], cost, fullTree);
@@ -287,6 +304,7 @@ void getKernelCostFullExpr(Expr *node, long &cost) {
 }
 
 void getKernelCostTopLevelExpr(Expr *node, long &cost) {
+  std::cout << __func__ << "\n";
   (void)getKernelCostImpl(node, cost, false);
 }
 
@@ -329,7 +347,7 @@ ResultMCP runMCP(Expr *expr) {
       m[i][j] = std::numeric_limits<long>::max();
       for (size_t k = i; k <= j - 1; k++) {
 
-        auto tmpexpr = mul(tmps[i][k], tmps[k + 1][j]);
+        auto tmpexpr = binaryMul({tmps[i][k], tmps[k + 1][j]}, true);
 #if DEBUG
         cout << "---\n";
         walk(tmpexpr);
@@ -337,10 +355,9 @@ ResultMCP runMCP(Expr *expr) {
 #endif
         long cost = 0;
         getKernelCostTopLevelExpr(tmpexpr, cost);
-        // long cost = 2 * pVector.at(i - 1) * pVector.at(k) * pVector.at(j);
         q = m[i][k] + m[k + 1][j] + cost;
         if (q < m[i][j]) {
-          tmps[i][j] = mul(tmps[i][k], tmps[k + 1][j]);
+          tmps[i][j] = binaryMul({tmps[i][k], tmps[k + 1][j]}, true);
           tmps[i][j]->inferProperties();
           m[i][j] = q;
           s[i][j] = k;

@@ -173,7 +173,7 @@ public:
   };
 };
 
-Expr *binaryMul(vector<Expr *> children);
+Expr *binaryMul(vector<Expr *> children, bool binary = false);
 
 } // end namespace details.
 
