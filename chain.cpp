@@ -1,5 +1,6 @@
 /*
-Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com>
+Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com> or
+<lorenzo.chelini@huawei.c om
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -23,7 +24,6 @@ SOFTWARE.
 #include "chain.h"
 #include "llvm/Support/Casting.h"
 #include <algorithm>
-#include <array>
 #include <iostream>
 #include <limits>
 
@@ -266,7 +266,7 @@ pair<long, long> getKernelCostImpl(Expr *node, long &cost, bool fullTree) {
     if (auto binaryOp = llvm::dyn_cast_or_null<NaryOp>(node)) {
       auto children = binaryOp->getChildren();
       // walk(node);
-      assert(children.size() == 2);
+      assert(children.size() == 2 && "expect only two children");
       pair<long, long> left = getKernelCostImpl(children[0], cost, fullTree);
       pair<long, long> right = getKernelCostImpl(children[1], cost, fullTree);
       // note this cost must be the cost of the top level expr
@@ -304,7 +304,6 @@ void getKernelCostFullExpr(Expr *node, long &cost) {
 }
 
 void getKernelCostTopLevelExpr(Expr *node, long &cost) {
-  std::cout << __func__ << "\n";
   (void)getKernelCostImpl(node, cost, false);
 }
 

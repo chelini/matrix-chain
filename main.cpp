@@ -1,5 +1,6 @@
 /*
-Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com>
+Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com> or
+<lorenzo.chelini@huawei.c om>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -20,12 +21,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "chain.h"
-#include <iostream>
-
-using namespace std;
-using namespace matrixchain;
-
-// TODO: RTTI: We shoud avoid getting the raw pointer
-// from a shared_ptr<Expr>
 int main() { return 0; }

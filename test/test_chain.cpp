@@ -1,3 +1,26 @@
+/*
+Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com> or
+<lorenzo.chelini@huawei.c om>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "chain.h"
 #include "gtest/gtest.h"
 
@@ -133,10 +156,7 @@ TEST(Chain, kernelCostWhenSPD) {
   A->setProperties({Expr::ExprProperty::FULL_RANK});
   long cost = 0;
   auto E = mul(mul(trans(A), A), B);
-  getKernelCostTopLevelExpr(E, cost);
-  EXPECT_EQ(cost, 6000);
-  cost = 0;
-  getKernelCostFullExpr(E, cost);
+  cost = getMCPFlops(E);
   EXPECT_EQ(cost, 22000);
 }
 
@@ -178,7 +198,7 @@ TEST(Chain, areSameTree) {
   is = exp1->isSame(exp3);
   EXPECT_EQ(is, false);
 }
-/*
+
 TEST(Chain, NormalForm) {
   ScopedContext ctx;
   auto *A = new Operand("A", {20, 20});
@@ -190,4 +210,3 @@ TEST(Chain, NormalForm) {
   auto *normalForm = expr->getNormalForm();
   walk(normalForm);
 }
-*/

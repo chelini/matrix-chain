@@ -1,5 +1,6 @@
 /*
-Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com>
+Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com> or
+<lorenzo.chelini@huawei.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -61,6 +62,7 @@ static bool isSameImpl(const Expr *tree1, const Expr *tree2) {
     if (llvm::isa<NaryOp>(tree1) && llvm::isa<NaryOp>(tree2)) {
       const NaryOp *tree1Op = llvm::dyn_cast_or_null<NaryOp>(tree1);
       const NaryOp *tree2Op = llvm::dyn_cast_or_null<NaryOp>(tree2);
+      // TODO: fix
       return isSameImpl(tree1Op->getChildren()[0], tree2Op->getChildren()[0]) &&
              isSameImpl(tree1Op->getChildren()[1], tree2Op->getChildren()[1]);
     }
@@ -71,18 +73,22 @@ static bool isSameImpl(const Expr *tree1, const Expr *tree2) {
 Expr *Operand::getNormalForm() { return this; }
 
 Expr *NaryOp::getNormalForm() {
-  // assert(0);
+  // TODO: What is the normal form for mul?
+  assert(0 && "not available");
   return nullptr;
 }
 
 Expr *UnaryOp::getNormalForm() {
   Expr *child = this->getChild();
   if (NaryOp *maybeMul = llvm::dyn_cast_or_null<NaryOp>(child)) {
-    Expr *leftChild = maybeMul->getChildren()[0]->getNormalForm();
-    Expr *rightChild = maybeMul->getChildren()[1]->getNormalForm();
-    return mul(trans(leftChild), trans(rightChild));
+    vector<Expr *> normalFormOperands;
+    auto children = maybeMul->getChildren();
+    int size = children.size();
+    for (int i = size - 1; i >= 0; i--)
+      normalFormOperands.push_back(trans(children.at(i)->getNormalForm()));
+    return binaryMul(normalFormOperands);
   }
-  assert(0);
+  assert(0 && "unreachable");
   return nullptr;
 }
 

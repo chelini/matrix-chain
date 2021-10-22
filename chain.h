@@ -1,5 +1,6 @@
 /*
-Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com>
+Copyright 2021 Lorenzo Chelini <l.chelini@icloud.com> or
+<lorenzo.chelini@huawei.c om>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -243,9 +244,4 @@ template <typename Arg, typename... Args> Expr *mul(Arg arg, Args... args) {
   assert(operands.size() >= 2 && "one or more mul");
   return details::binaryMul(operands);
 }
-
-// Exposed for debug only.
-void getKernelCostTopLevelExpr(Expr *node, long &cost);
-void getKernelCostFullExpr(Expr *node, long &cost);
-
 #endif
