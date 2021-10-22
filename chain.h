@@ -83,12 +83,12 @@ public:
   virtual void inferProperties() = 0;
   virtual Expr *getNormalForm() = 0;
 
-  virtual bool isUpperTriangular() = 0;
-  virtual bool isLowerTriangular() = 0;
-  virtual bool isSquare() = 0;
-  virtual bool isSymmetric() = 0;
-  virtual bool isFullRank() = 0;
-  virtual bool isSPD() = 0;
+  virtual bool isUpperTriangular() const = 0;
+  virtual bool isLowerTriangular() const = 0;
+  virtual bool isSquare() const = 0;
+  virtual bool isSymmetric() const = 0;
+  virtual bool isFullRank() const = 0;
+  virtual bool isSPD() const = 0;
 
   bool isTransposeOf(const Expr *right);
   bool isSame(const Expr *right);
@@ -131,12 +131,12 @@ public:
 
   vector<Expr *> getChildren() const { return children; }
 
-  bool isUpperTriangular();
-  bool isLowerTriangular();
-  bool isSquare();
-  bool isSymmetric();
-  bool isFullRank();
-  bool isSPD();
+  bool isUpperTriangular() const;
+  bool isLowerTriangular() const;
+  bool isSquare() const;
+  bool isSymmetric() const;
+  bool isFullRank() const;
+  bool isSPD() const;
 
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::BINARY;
@@ -162,12 +162,12 @@ public:
   Expr *getChild() const { return child; };
   UnaryOpKind getKind() const { return kind; };
 
-  bool isSquare();
-  bool isSymmetric();
-  bool isUpperTriangular();
-  bool isLowerTriangular();
-  bool isFullRank();
-  bool isSPD();
+  bool isSquare() const;
+  bool isSymmetric() const;
+  bool isUpperTriangular() const;
+  bool isLowerTriangular() const;
+  bool isFullRank() const;
+  bool isSPD() const;
 
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::UNARY;
@@ -202,12 +202,12 @@ public:
   };
   Expr *getNormalForm();
   void inferProperties(){};
-  bool isUpperTriangular();
-  bool isLowerTriangular();
-  bool isSquare();
-  bool isSymmetric();
-  bool isFullRank();
-  bool isSPD();
+  bool isUpperTriangular() const;
+  bool isLowerTriangular() const;
+  bool isSquare() const;
+  bool isSymmetric() const;
+  bool isFullRank() const;
+  bool isSPD() const;
   static bool classof(const Expr *expr) {
     return expr->getKind() == ExprKind::OPERAND;
   };

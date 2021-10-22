@@ -25,31 +25,31 @@ SOFTWARE.
 #include "llvm/Support/Casting.h"
 #include <algorithm>
 
-template <Expr::ExprProperty P> bool isX(Operand *operand) {
+template <Expr::ExprProperty P> bool isX(const Operand *operand) {
   auto inferredProperties = operand->getProperties();
   return std::any_of(inferredProperties.begin(), inferredProperties.end(),
                      [](Expr::ExprProperty p) { return p == P; });
 }
 
-bool Operand::isUpperTriangular() {
+bool Operand::isUpperTriangular() const {
   return isX<ExprProperty::UPPER_TRIANGULAR>(this);
 }
 
-bool Operand::isLowerTriangular() {
+bool Operand::isLowerTriangular() const {
   return isX<ExprProperty::LOWER_TRIANGULAR>(this);
 }
 
-bool Operand::isSquare() { return isX<ExprProperty::SQUARE>(this); }
+bool Operand::isSquare() const { return isX<ExprProperty::SQUARE>(this); }
 
-bool Operand::isSymmetric() { return isX<ExprProperty::SYMMETRIC>(this); }
+bool Operand::isSymmetric() const { return isX<ExprProperty::SYMMETRIC>(this); }
 
-bool Operand::isFullRank() { return isX<ExprProperty::FULL_RANK>(this); }
+bool Operand::isFullRank() const { return isX<ExprProperty::FULL_RANK>(this); }
 
-bool Operand::isSPD() { return isX<ExprProperty::SPD>(this); }
+bool Operand::isSPD() const { return isX<ExprProperty::SPD>(this); }
 
 // ----------------------------------------------------------------------
 
-bool UnaryOp::isUpperTriangular() {
+bool UnaryOp::isUpperTriangular() const {
   auto kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE:
@@ -60,7 +60,7 @@ bool UnaryOp::isUpperTriangular() {
   return false;
 }
 
-bool UnaryOp::isLowerTriangular() {
+bool UnaryOp::isLowerTriangular() const {
   auto kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE:
@@ -71,7 +71,7 @@ bool UnaryOp::isLowerTriangular() {
   return false;
 }
 
-bool UnaryOp::isSquare() {
+bool UnaryOp::isSquare() const {
   auto kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE:
@@ -82,7 +82,7 @@ bool UnaryOp::isSquare() {
   return false;
 }
 
-bool UnaryOp::isSymmetric() {
+bool UnaryOp::isSymmetric() const {
   auto kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE:
@@ -93,7 +93,7 @@ bool UnaryOp::isSymmetric() {
   return false;
 }
 
-bool UnaryOp::isFullRank() {
+bool UnaryOp::isFullRank() const {
   auto kind = this->getKind();
   switch (kind) {
   case UnaryOpKind::TRANSPOSE:
@@ -105,42 +105,52 @@ bool UnaryOp::isFullRank() {
   return false;
 }
 
-bool UnaryOp::isSPD() {
+bool UnaryOp::isSPD() const {
   assert(0 && "no impl");
   return false;
 }
 
 // ----------------------------------------------------------------------
 
-bool NaryOp::isUpperTriangular() {
+bool NaryOp::isUpperTriangular() const {
   auto kind = this->getKind();
   switch (kind) {
-  case NaryOp::NaryOpKind::MUL:
-    // TODO: all_of at this point.
-    return children[0]->isUpperTriangular() && children[1]->isUpperTriangular();
+  case NaryOp::NaryOpKind::MUL: {
+    for (auto *child : this->getChildren()) {
+      if (!child->isUpperTriangular())
+        return false;
+    }
+    return true;
+  }
   default:
     assert(0 && "UNK");
   }
   return false;
 }
 
-bool NaryOp::isLowerTriangular() {
+bool NaryOp::isLowerTriangular() const {
   auto kind = this->getKind();
   switch (kind) {
-  case NaryOp::NaryOpKind::MUL:
-    // TODO: all_of at this point.
-    return children[0]->isLowerTriangular() && children[1]->isLowerTriangular();
+  case NaryOp::NaryOpKind::MUL: {
+    for (auto *child : this->getChildren()) {
+      if (!child->isLowerTriangular())
+        return false;
+    }
+    return true;
+  }
   default:
     assert(0 && "UNK");
   }
   return false;
 }
 
-bool NaryOp::isSquare() { assert(0 && "no impl"); }
+bool NaryOp::isSquare() const { assert(0 && "no impl"); }
 
-bool NaryOp::isSymmetric() { return children[0]->isTransposeOf(children[1]); }
+bool NaryOp::isSymmetric() const {
+  return children[0]->isTransposeOf(children[1]);
+}
 
-bool NaryOp::isFullRank() {
+bool NaryOp::isFullRank() const {
   // assert(0 && "no impl");
   return false;
 }
@@ -148,7 +158,7 @@ bool NaryOp::isFullRank() {
 // see:
 // https://github.com/HPAC/linnea/blob/c8fb5d1f64666bf63d35859484a5041ff75dbb90/linnea/algebra/property_inference.py#L109
 // TODO: miss check left.columns >= left.rows
-bool NaryOp::isSPD() {
+bool NaryOp::isSPD() const {
   auto kind = this->getKind();
   switch (kind) {
   case NaryOp::NaryOpKind::MUL:
@@ -158,18 +168,3 @@ bool NaryOp::isSPD() {
   }
   return false;
 }
-
-// ----------------------------------------------------------------------
-/*
-bool NaryOp::isUpperTriangular() {
-  return std::all_of(
-      this->getChildren().begin(), this->getChildren().end(),
-      [](shared_ptr<Expr> child) { return child->isUpperTriangular(); });
-}
-
-bool NaryOp::isLowerTriangular() {
-  return std::all_of(
-      this->getChildren().begin(), this->getChildren().end(),
-      [](shared_ptr<Expr> child) { return child->isLowerTriangular(); });
-}
-*/
